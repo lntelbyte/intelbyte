@@ -132,7 +132,7 @@ internal class IbForm : Form
             ReclipLater(80);
             ReclipLater(250);
         };
-        Opacity = 0.94;
+        Opacity = 1f;
         FormClosing += OnIbClosing;
     }
 
@@ -168,7 +168,6 @@ internal class IbForm : Form
         _applying = true;
         try
         {
-            DwmGlass.Apply(this);
             NativeMethods.ClipRoundWindow(this);
         }
         catch {}
