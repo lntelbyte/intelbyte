@@ -1,0 +1,46 @@
+{
+  "name": "intelbyte",
+  "version": "0.3.0",
+  "description": "Windows background app that redacts your email & phone on screen across every CDP app (Discord, browsers, any Electron app). Runs hidden with a tray icon. OPSEC for streaming — no extensions, no client mods.",
+  "type": "module",
+  "bin": {
+    "intelbyte": "bin/intelbyte.js"
+  },
+  "scripts": {
+    "start": "node bin/intelbyte.js",
+    "install-shield": "node bin/intelbyte.js install",
+    "status": "node bin/intelbyte.js status",
+    "doctor": "node bin/intelbyte.js doctor",
+    "build:exe": "powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "win32"
+  ],
+  "keywords": [
+    "opsec",
+    "privacy",
+    "discord",
+    "email",
+    "redaction",
+    "streaming",
+    "cdp",
+    "screen-recording",
+    "windows",
+    "background",
+    "tray"
+  ],
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.2",
+    "sql.js": "^1.14.1",
+    "ws": "^8.21.0"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.21.0",
+    "esbuild": "^0.28.1"
+  }
+}

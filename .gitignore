@@ -1,0 +1,15 @@
+node_modules/
+windows/node_modules/
+linux/node_modules/
+windows/dist/
+*.log
+.DS_Store
+Thumbs.db
+*.zip
+.env
+.env.*
+config.json
+status.json
+shield.log
+paused.flag
+

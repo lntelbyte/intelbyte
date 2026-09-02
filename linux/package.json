@@ -1,0 +1,37 @@
+{
+  "name": "intelbyte",
+  "version": "0.3.0",
+  "description": "Terminal-driven email & phone redaction across every CDP app (Discord, browsers, any Electron app) on Linux. Wire once, auto-mask whatever you open. OPSEC for streaming — no extensions, no client mods.",
+  "type": "module",
+  "bin": {
+    "intelbyte": "bin/intelbyte.js"
+  },
+  "scripts": {
+    "start": "node bin/intelbyte.js",
+    "shield": "node bin/intelbyte.js shield",
+    "doctor": "node bin/intelbyte.js doctor"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "linux"
+  ],
+  "keywords": [
+    "opsec",
+    "privacy",
+    "discord",
+    "email",
+    "redaction",
+    "streaming",
+    "cdp",
+    "screen-recording",
+    "linux"
+  ],
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.2",
+    "sql.js": "^1.14.1",
+    "ws": "^8.21.0"
+  },
+  "license": "MIT"
+}
