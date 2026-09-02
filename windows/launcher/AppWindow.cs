@@ -165,7 +165,7 @@ internal sealed class AppWindow : IbForm
             SetBusy(false, "");
             return;
         }
-        SetBusy(true, "Starting…");
+        SetBusy(false, "");
         BootOn();
     }
 
@@ -202,18 +202,20 @@ internal sealed class AppWindow : IbForm
 
     private void ToggleShield()
     {
-        if (_busy) return;
         if (!_running)
         {
-            SetBusy(true, "");
+            _ui.Big = "ON";
+            _ui.Sub = "Starting…";
+            _ui.Invalidate();
             BootOn();
             return;
         }
-        SetBusy(true, "Stopping…");
+        _ui.Big = "OFF";
+        _ui.Sub = "Stopping…";
+        _ui.Invalidate();
         RunBg(new string[][] { new[] { "stop" } }, delegate
         {
             RefreshAsync(true);
-            SetBusy(false, "");
         });
     }
 

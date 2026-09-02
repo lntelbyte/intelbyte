@@ -19,10 +19,23 @@ internal sealed class GlassView : Control
     public const int Cluster = 12;
     public const int Logo = 72;
     public const int LeftW = 240;
-    public const int ToggleW = 152;
-    public const int ToggleH = 30;
+    public const int ToggleW = 168;
+    public const int ToggleH = 36;
 
-    public string Big = "OFF";
+    private string _big = "OFF";
+    public string Big
+    {
+        get { return _big; }
+        set
+        {
+            _big = value ?? "OFF";
+            if (_switch != null)
+            {
+                _switch.On = string.Equals(_big, "ON", StringComparison.OrdinalIgnoreCase);
+                _switch.Invalidate();
+            }
+        }
+    }
     public string Sub = "Click ON to start protecting.";
     public string Status = "Off";
     public string Count = "0";
@@ -45,6 +58,7 @@ internal sealed class GlassView : Control
 
     private readonly Image _logo;
     private readonly GlassField _search;
+    private readonly OnOffSwitch _switch;
     private Bitmap _frost;
     private int _bmpW, _bmpH;
     private int _hot = -1;
@@ -88,6 +102,11 @@ internal sealed class GlassView : Control
         _search.Box.LostFocus += delegate { Invalidate(); };
         _search.Box.TextChanged += delegate { Invalidate(); };
         _search.Visible = true;
+
+        _switch = new OnOffSwitch();
+        _switch.Toggled += delegate { if (ToggleClick != null) ToggleClick(this, EventArgs.Empty); };
+        Controls.Add(_switch);
+        _switch.BringToFront();
         SetLoading(false, null);
     }
 
@@ -196,6 +215,13 @@ internal sealed class GlassView : Control
         _rDisc = new Rectangle(left, linkY + 18, 150, 18);
         _rOff = new Rectangle(left, linkY + 44, ToggleW / 2, ToggleH);
         _rOn = new Rectangle(left + ToggleW / 2, _rOff.Y, ToggleW / 2, ToggleH);
+        if (_switch != null)
+        {
+            _switch.Bounds = new Rectangle(left, linkY + 44, ToggleW, ToggleH);
+            _switch.On = string.Equals(Big, "ON", StringComparison.OrdinalIgnoreCase);
+            _switch.Visible = !Loading;
+            _switch.BringToFront();
+        }
 
         _rBar = new Rectangle(right, top, rightW, Add);
         _rAdd = new Rectangle(_rBar.Right - Add, _rBar.Y, Add, Add);
@@ -267,8 +293,6 @@ internal sealed class GlassView : Control
         TextRenderer.DrawText(g, "discord.gg/intelbyte", _fMeta, _rDisc, discCol,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
 
-        DrawToggle(g);
-
         TextRenderer.DrawText(g, Sub, _fMeta,
             new Rectangle(_rOff.X, _rOff.Bottom + Cluster, LeftW, 40), Color.FromArgb(160, 160, 164),
             TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
@@ -334,35 +358,6 @@ internal sealed class GlassView : Control
         TextRenderer.DrawText(g, "intelbyte", _fTitle,
             new Rectangle(x + mark + 8, _card.Y, name.Width + 8, Header), Color.FromArgb(210, 210, 214),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
-    }
-
-    private void DrawToggle(Graphics g)
-    {
-        var on = string.Equals(Big, "ON", StringComparison.OrdinalIgnoreCase);
-        var pill = new Rectangle(_rOff.X, _rOff.Y, ToggleW, ToggleH);
-        if (pill.Width < 8) return;
-        using (var track = UiShapes.RoundedRect(pill, ToggleH / 2))
-        using (var trackFill = new SolidBrush(Color.FromArgb(230, 28, 28, 32)))
-            g.FillPath(trackFill, track);
-
-        var thumb = on ? _rOn : _rOff;
-        thumb.Inflate(-3, -3);
-        using (var tpath = UiShapes.RoundedRect(thumb, Math.Max(4, (ToggleH - 6) / 2)))
-        using (var fill = new SolidBrush(on
-            ? Color.FromArgb(186, 214, 176)
-            : Color.FromArgb(236, 236, 240)))
-            g.FillPath(fill, tpath);
-
-        using (var ring = new Pen(Color.FromArgb(90, 255, 255, 255)))
-        using (var outline = UiShapes.RoundedRect(pill, ToggleH / 2))
-            g.DrawPath(ring, outline);
-
-        var offCol = !on ? Color.FromArgb(20, 20, 22) : Color.FromArgb(210, 210, 214);
-        var onCol = on ? Color.FromArgb(20, 20, 22) : Color.FromArgb(210, 210, 214);
-        TextRenderer.DrawText(g, "OFF", _fToggle, _rOff, offCol,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-        TextRenderer.DrawText(g, "ON", _fToggle, _rOn, onCol,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
     }
 
     private void PaintList(Graphics g)
@@ -443,7 +438,7 @@ internal sealed class GlassView : Control
         if (hot == 9) { if (StreamProofClick != null) StreamProofClick(this, EventArgs.Empty); return; }
         if (hot == 7) { OpenUrl("https://intelbyte.cc"); return; }
         if (hot == 8) { OpenUrl("https://discord.gg/intelbyte"); return; }
-        if (hot == 5 || hot == 6)
+        if (hot == 5 || hot == 6 || InToggleRail(e.Location))
         {
             if (ToggleClick != null) ToggleClick(this, EventArgs.Empty);
             return;
@@ -471,8 +466,14 @@ internal sealed class GlassView : Control
             Invalidate();
             return;
         }
-        if (_card.Contains(e.Location) && !_rBar.Contains(e.Location))
+        if (_card.Contains(e.Location) && !_rBar.Contains(e.Location) && !InToggleRail(e.Location))
             NativeMethods.DragMove(FindForm());
+    }
+
+    private bool InToggleRail(Point pt)
+    {
+        var rail = new Rectangle(Pad, Header, LeftW + Pad, Math.Max(8, Height - Header - Row * 2));
+        return rail.Contains(pt);
     }
 
     private int Hit(Point pt)
@@ -480,14 +481,13 @@ internal sealed class GlassView : Control
         if (_rClose.Contains(pt)) return 0;
         if (_rMin.Contains(pt)) return 1;
         if (_rGreen.Contains(pt)) return 2;
-        if (_rOff.Contains(pt)) return 5;
-        if (_rOn.Contains(pt)) return 6;
         if (_rStart.Contains(pt)) return 4;
         if (_rProof.Contains(pt)) return 9;
         if (_rSite.Contains(pt)) return 7;
         if (_rDisc.Contains(pt)) return 8;
         for (var i = 0; i < _nav.Length; i++)
             if (_nav[i].Contains(pt)) return 10 + i;
+        if (InToggleRail(pt)) return 6;
         return -1;
     }
 
@@ -532,6 +532,67 @@ internal sealed class GlassView : Control
             _fList.Dispose();
             _fMeta.Dispose();
         }
+        base.Dispose(disposing);
+    }
+}
+
+internal sealed class OnOffSwitch : Control
+{
+    public bool On;
+    public event EventHandler Toggled;
+    private readonly Font _font = new Font("Segoe UI Semibold", 10f);
+
+    public OnOffSwitch()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+                 ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        Cursor = Cursors.Hand;
+        TabStop = false;
+        BackColor = Color.FromArgb(28, 28, 32);
+        Size = new Size(GlassView.ToggleW, GlassView.ToggleH);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left && Toggled != null)
+            Toggled(this, EventArgs.Empty);
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e) { }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        if (Width < 8 || Height < 8) return;
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+        var pill = new Rectangle(0, 0, Width - 1, Height - 1);
+        using (var track = UiShapes.RoundedRect(pill, Height / 2))
+        using (var trackFill = new SolidBrush(Color.FromArgb(230, 28, 28, 32)))
+            g.FillPath(trackFill, track);
+        var half = Width / 2;
+        var thumb = On ? new Rectangle(half, 0, Width - half, Height) : new Rectangle(0, 0, half, Height);
+        thumb.Inflate(-3, -3);
+        using (var tpath = UiShapes.RoundedRect(thumb, Math.Max(4, (Height - 6) / 2)))
+        using (var fill = new SolidBrush(On
+            ? Color.FromArgb(186, 214, 176)
+            : Color.FromArgb(236, 236, 240)))
+            g.FillPath(fill, tpath);
+        using (var ring = new Pen(Color.FromArgb(90, 255, 255, 255)))
+        using (var outline = UiShapes.RoundedRect(pill, Height / 2))
+            g.DrawPath(ring, outline);
+        var offCol = !On ? Color.FromArgb(20, 20, 22) : Color.FromArgb(210, 210, 214);
+        var onCol = On ? Color.FromArgb(20, 20, 22) : Color.FromArgb(210, 210, 214);
+        TextRenderer.DrawText(g, "OFF", _font, new Rectangle(0, 0, half, Height), offCol,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        TextRenderer.DrawText(g, "ON", _font, new Rectangle(half, 0, Width - half, Height), onCol,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) try { _font.Dispose(); } catch {}
         base.Dispose(disposing);
     }
 }

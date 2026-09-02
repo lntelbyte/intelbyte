@@ -116,6 +116,7 @@ internal class IbForm : Form
 {
     public IbForm()
     {
+        AutoScaleMode = AutoScaleMode.None;
         FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false;
         BackColor = AppTheme.Bg;
