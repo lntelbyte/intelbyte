@@ -37,6 +37,7 @@ export async function startInjector(port, source, onAttach) {
   const seen = new Set();
   let stopped = false;
   let scanning = false;
+  let currentSource = source;
 
   async function armPreload(client, sessionId) {
     try {
@@ -45,9 +46,9 @@ export async function startInjector(port, source, onAttach) {
     } catch {}
     try {
       if (sessionId) {
-        await client.send('Page.addScriptToEvaluateOnNewDocument', { source }, sessionId);
+        await client.send('Page.addScriptToEvaluateOnNewDocument', { source: currentSource }, sessionId);
       } else {
-        await client.Page.addScriptToEvaluateOnNewDocument({ source });
+        await client.Page.addScriptToEvaluateOnNewDocument({ source: currentSource });
       }
     } catch {}
   }
@@ -56,9 +57,9 @@ export async function startInjector(port, source, onAttach) {
     try {
       if (sessionId) {
         await client.send('Runtime.enable', {}, sessionId);
-        await client.send('Runtime.evaluate', { expression: source }, sessionId);
+        await client.send('Runtime.evaluate', { expression: currentSource }, sessionId);
       } else {
-        await client.Runtime.evaluate({ expression: source });
+        await client.Runtime.evaluate({ expression: currentSource });
       }
     } catch {}
   }
@@ -178,12 +179,12 @@ export async function startInjector(port, source, onAttach) {
     await waitForLoad(client);
 
     try {
-      await client.Runtime.evaluate({ expression: source });
+      await client.Runtime.evaluate({ expression: currentSource });
     } catch {
 
       await sleep(350);
       if (ctx != null) {
-        await client.Runtime.evaluate({ expression: source, contextId: ctx }).catch(() => {});
+        await client.Runtime.evaluate({ expression: currentSource, contextId: ctx }).catch(() => {});
       }
     }
     burstEval(client);
@@ -234,6 +235,14 @@ export async function startInjector(port, source, onAttach) {
 
   return {
     count: () => seen.size,
+    update(nextSource) {
+      if (typeof nextSource !== 'string' || stopped) return;
+      currentSource = nextSource;
+      for (const rec of clients.values()) {
+        armPreload(rec.client).catch(() => {});
+        evalNow(rec.client).catch(() => {});
+      }
+    },
     stop() {
       stopped = true;
       clearInterval(interval);

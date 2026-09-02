@@ -5,5 +5,5 @@ using System.Reflection;
 [assembly: AssemblyCompany("IntelByte")]
 [assembly: AssemblyCopyright("Copyright (c) 2026 IntelByte")]
 [assembly: AssemblyDescription("Installs IntelByte screen privacy.")]
-[assembly: AssemblyVersion("0.3.10.0")]
-[assembly: AssemblyFileVersion("0.3.10.0")]
+[assembly: AssemblyVersion("0.3.11.0")]
+[assembly: AssemblyFileVersion("0.3.11.0")]

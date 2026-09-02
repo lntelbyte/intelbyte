@@ -1,4 +1,4 @@
-import { buildPairs, buildPayloadData, maskValue } from './core/config.js';
+import { buildPairs, buildPayloadData, load, maskValue } from './core/config.js';
 import { buildPayload } from './core/payload.js';
 import { probePort, startInjector } from './core/cdp.js';
 import { startBidiInjector } from './core/bidi.js';
@@ -7,9 +7,13 @@ import { banner, title, ok, warn, info, line, c, sleep } from './core/ui.js';
 export async function runShield(platform, cfg, opts = {}) {
   const quiet = !!opts.quiet;
   const emit = opts.onEvent || (() => {});
-  const apps = cfg.apps || {};
-  const ids = Object.keys(apps);
-  const pairs = buildPairs(cfg);
+  let currentCfg = cfg;
+  let apps = currentCfg.apps || {};
+  let ids = Object.keys(apps);
+  let pairs = buildPairs(currentCfg);
+  let source = buildPayload(buildPayloadData(currentCfg));
+  let sourceSignature = JSON.stringify(buildPayloadData(currentCfg));
+  let autoRelaunch = currentCfg.autoRelaunch !== false;
 
   if (!quiet) {
     await banner();
@@ -25,15 +29,11 @@ export async function runShield(platform, cfg, opts = {}) {
           c.cyan('intelbyte protect-phone <number>')
       );
     emit({ type: 'idle', reason: 'no-entries' });
-    return null;
   }
   if (!ids.length) {
     if (!quiet) warn('No apps wired yet. One-time: ' + c.cyan('intelbyte setup'));
     emit({ type: 'idle', reason: 'no-apps' });
-    return null;
   }
-
-  const autoRelaunch = cfg.autoRelaunch !== false;
 
   if (!quiet) {
     ok('Masked entries:');
@@ -42,10 +42,14 @@ export async function runShield(platform, cfg, opts = {}) {
     }
     line('');
     ok('Watching:');
-    const w = Math.max(...ids.map((id) => apps[id].label.length));
-    for (const id of ids) {
-      const a = apps[id];
-      line(`  ${c.cyan(a.label.padEnd(w))}  ${c.gray(`port ${a.port} · ${a.protocol}`)}`);
+    if (ids.length) {
+      const w = Math.max(...ids.map((id) => apps[id].label.length));
+      for (const id of ids) {
+        const a = apps[id];
+        line(`  ${c.cyan(a.label.padEnd(w))}  ${c.gray(`port ${a.port} · ${a.protocol}`)}`);
+      }
+    } else {
+      line(c.gray('  No wired apps yet — setup will be picked up automatically.'));
     }
     line('');
     if (autoRelaunch) {
@@ -58,7 +62,6 @@ export async function runShield(platform, cfg, opts = {}) {
     }
   }
 
-  const source = buildPayload(buildPayloadData(cfg));
   const active = new Map();
   const starting = new Set();
   const misses = new Map();
@@ -68,6 +71,43 @@ export async function runShield(platform, cfg, opts = {}) {
   const gaveUp = new Set();
   const MAX_TRIES = 3;
   let stopped = false;
+
+  function sameApp(a, b) {
+    return !!a && !!b && a.port === b.port && a.protocol === b.protocol && a.image === b.image;
+  }
+
+  function refreshConfig() {
+    let latest;
+    try {
+      latest = load();
+    } catch {
+      return;
+    }
+
+    const latestApps = latest.apps || {};
+    const latestIds = Object.keys(latestApps);
+    for (const id of [...active.keys()]) {
+      if (!sameApp(apps[id], latestApps[id])) {
+        try { active.get(id).stop(); } catch {}
+        active.delete(id);
+      }
+    }
+    apps = latestApps;
+    ids = latestIds;
+    autoRelaunch = latest.autoRelaunch !== false;
+
+    const latestData = buildPayloadData(latest);
+    const latestSignature = JSON.stringify(latestData);
+    if (latestSignature !== sourceSignature) {
+      sourceSignature = latestSignature;
+      source = buildPayload(latestData);
+      for (const inj of active.values()) {
+        try { inj.update(source); } catch {}
+      }
+    }
+    currentCfg = latest;
+    pairs = buildPairs(latest);
+  }
 
   async function ensureProtected(id) {
     const a = apps[id];
@@ -111,6 +151,7 @@ export async function runShield(platform, cfg, opts = {}) {
 
   async function tick() {
     if (stopped) return;
+    refreshConfig();
     if (opts.isPaused && opts.isPaused()) {
       emit({ type: 'paused', connected: [...active.keys()] });
       return;

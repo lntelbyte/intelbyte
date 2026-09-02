@@ -22,6 +22,7 @@ export async function startBidiInjector(port, source, onAttach) {
   const pending = new Map();
   const handlers = {};
   let stopped = false;
+  let currentSource = source;
 
   ws.on('message', (data) => {
     let msg;
@@ -82,7 +83,7 @@ export async function startBidiInjector(port, source, onAttach) {
     if (!ctxId || stopped) return;
     try {
       await cmd('script.evaluate', {
-        expression: source,
+        expression: currentSource,
         target: { context: ctxId },
         awaitPromise: false,
       });
@@ -94,7 +95,7 @@ export async function startBidiInjector(port, source, onAttach) {
     } catch {}
   }
 
-  await cmd('script.addPreloadScript', { functionDeclaration: '() => { ' + source + ' }' }).catch(
+  await cmd('script.addPreloadScript', { functionDeclaration: '() => { ' + currentSource + ' }' }).catch(
     () => {}
   );
 
@@ -136,6 +137,12 @@ export async function startBidiInjector(port, source, onAttach) {
 
   return {
     count: () => seen.size,
+    update(nextSource) {
+      if (typeof nextSource !== 'string' || stopped) return;
+      currentSource = nextSource;
+      cmd('script.addPreloadScript', { functionDeclaration: '() => { ' + currentSource + ' }' }).catch(() => {});
+      sweep().catch(() => {});
+    },
     stop() {
       stopped = true;
       clearInterval(interval);
