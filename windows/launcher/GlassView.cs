@@ -525,3 +525,10 @@ internal sealed class GlassView : Control
         base.Dispose(disposing);
     }
 }
+
+internal sealed class RowData
+{
+    public string Type;
+    public string Real;
+    public string Fake;
+}
