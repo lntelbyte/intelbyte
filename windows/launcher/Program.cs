@@ -119,7 +119,7 @@ internal static class Program
                 };
                 proc.BeginOutputReadLine();
                 proc.BeginErrorReadLine();
-                if (!proc.WaitForExit(15000))
+                if (!proc.WaitForExit(45000))
                 {
                     try { proc.Kill(); } catch {}
                     try { proc.WaitForExit(2000); } catch {}

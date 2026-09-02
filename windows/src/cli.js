@@ -557,13 +557,13 @@ export async function run(argv) {
       cmdUninstall();
       break;
     case 'start':
-      cmdStart();
+      await cmdStart();
       break;
     case 'stop':
       cmdStop();
       break;
     case 'restart':
-      cmdRestart();
+      await cmdRestart();
       break;
     case 'status':
       cmdStatus();

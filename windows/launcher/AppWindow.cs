@@ -174,7 +174,8 @@ internal sealed class AppWindow : IbForm
         _ui.SetLoading(true, "Turning on");
         ThreadPool.QueueUserWorkItem(delegate
         {
-            try { Program.RunCli(_node, _bin, _app, new[] { "start" }); }
+            var startOut = "";
+            try { startOut = Program.RunCli(_node, _bin, _app, new[] { "start" }); }
             catch {}
             string status = null, list = null;
             try
@@ -188,6 +189,11 @@ internal sealed class AppWindow : IbForm
                 BeginInvoke((Action)delegate
                 {
                     ApplyState(status, list);
+                    if (!_running)
+                    {
+                        var fail = FailHint(startOut) ?? FailHint(status);
+                        if (fail != null) _ui.Sub = fail;
+                    }
                     _ui.SetLoading(false, null);
                     SetBusy(false, "");
                 });
@@ -396,8 +402,7 @@ internal sealed class AppWindow : IbForm
 
     private void ApplyState(string status, string list)
     {
-        var running = status != null && status.IndexOf("running", StringComparison.OrdinalIgnoreCase) >= 0
-                      && status.IndexOf("Not running", StringComparison.OrdinalIgnoreCase) < 0;
+        var running = IsShieldUp(status);
         _running = running;
         _ui.Big = running ? "ON" : "OFF";
         _ui.Sub = running ? "Masking email & phone on stream." : "Click ON to start protecting.";
@@ -407,6 +412,26 @@ internal sealed class AppWindow : IbForm
         _ui.Count = rows.Count.ToString();
         if (!_busy) _ui.Foot = "";
         _ui.Invalidate();
+    }
+
+    private static bool IsShieldUp(string status)
+    {
+        if (string.IsNullOrEmpty(status)) return false;
+        if (status.IndexOf("IB_STATE=running", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (status.IndexOf("IB_STATE=stopped", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+        if (status.IndexOf("IB_STATE=failed", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+        return status.IndexOf("running", StringComparison.OrdinalIgnoreCase) >= 0
+            && status.IndexOf("Not running", StringComparison.OrdinalIgnoreCase) < 0;
+    }
+
+    private static string FailHint(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        if (text.IndexOf("IB_STATE=failed", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("ERROR:", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0)
+            return "Could not start. Windows may be blocking node.exe.";
+        return null;
     }
 
     private static List<RowData> ParseList(string list)

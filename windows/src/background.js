@@ -10,9 +10,8 @@ import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { load, configDir } from './core/config.js';
-import platform from './platform/index.js';
-import { runShield } from './shield.js';
 import { ps, psq } from './platform/windows/ps.js';
+import { setTimeout as sleep } from 'timers/promises';
 import { c, ok, info, warn, err, title, line } from './core/ui.js';
 
 export function appRoot() {
@@ -116,6 +115,8 @@ export async function runBackgroundWorker() {
   logLine(`shield-bg started (pid ${process.pid})`);
 
   const cfg = load();
+  const { runShield } = await import('./shield.js');
+  const platform = (await import('./platform/index.js')).default;
   let last = { type: 'starting' };
   let lastWrite = 0;
   const snapshot = (extra) => {
@@ -187,7 +188,13 @@ export function startDetached() {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
+    env: {
+      ...process.env,
+      INTELBYTE_APP_ROOT: process.env.INTELBYTE_APP_ROOT || REPO_ROOT,
+      INTELBYTE_NODE: NODE_EXE,
+    },
   });
+  child.on('error', (e) => logLine('spawn error: ' + (e && e.message ? e.message : e)));
   child.unref();
   return child.pid;
 }
@@ -284,14 +291,30 @@ export function cmdUninstall() {
   info('Your protected entries and app wiring are untouched. Remove wiring with ' + c.cyan('intelbyte unsetup') + '.');
 }
 
-export function cmdStart() {
+export async function cmdStart() {
   if (isRunning()) {
+    console.log('IB_STATE=running');
     info('Background shield is already running (pid ' + readPid() + ').');
     return;
   }
   ensureDir();
   const pid = startDetached();
-  ok('Background shield started (hidden), pid ' + pid + '.');
+  if (!pid) {
+    console.log('IB_STATE=failed');
+    err('Could not launch the shield process.');
+    return;
+  }
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline) {
+    if (isRunning()) {
+      console.log('IB_STATE=running');
+      ok('Background shield started (hidden), pid ' + readPid() + '.');
+      return;
+    }
+    await sleep(200);
+  }
+  console.log('IB_STATE=failed');
+  err('Shield did not come up. If Windows blocked node.exe, unblock IntelByte in Defender. Log: ' + LOG_FILE);
 }
 
 export function cmdStop() {
@@ -299,10 +322,9 @@ export function cmdStop() {
   else info('Background shield was not running.');
 }
 
-export function cmdRestart() {
+export async function cmdRestart() {
   stop();
-  const pid = startDetached();
-  ok('Background shield restarted, pid ' + pid + '.');
+  await cmdStart();
 }
 
 export function cmdPause() {
@@ -323,6 +345,7 @@ export function cmdStatus() {
   title('intelbyte • background shield status');
   const running = isRunning();
   const pid = readPid();
+  console.log(running ? 'IB_STATE=running' : 'IB_STATE=stopped');
   if (running) ok(`Running (pid ${pid})` + (isPaused() ? c.yellow('  · PAUSED') : ''));
   else warn('Not running. Start it with ' + c.cyan('intelbyte start') + ' or ' + c.cyan('intelbyte install') + '.');
 
