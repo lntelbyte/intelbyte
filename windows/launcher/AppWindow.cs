@@ -22,6 +22,7 @@ internal sealed class AppWindow : IbForm
     private bool _reallyQuit;
     private bool _allowShow;
     private bool _bootDone;
+    private bool _setupAttempted;
     private bool _balloonShown;
     private volatile bool _refreshing;
 
@@ -175,6 +176,23 @@ internal sealed class AppWindow : IbForm
         ThreadPool.QueueUserWorkItem(delegate
         {
             var startOut = "";
+            try
+            {
+                if (!_setupAttempted)
+                {
+                    var before = Program.RunCli(_node, _bin, _app, new[] { "status" });
+                    if (before.IndexOf("No apps wired yet", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        var setup = Program.RunCli(_node, _bin, _app, new[] { "setup" });
+                        _setupAttempted = setup.IndexOf("Setup done", StringComparison.OrdinalIgnoreCase) >= 0;
+                    }
+                    else
+                    {
+                        _setupAttempted = true;
+                    }
+                }
+            }
+            catch {}
             try { startOut = Program.RunCli(_node, _bin, _app, new[] { "start" }); }
             catch {}
             string status = null, list = null;
@@ -189,13 +207,19 @@ internal sealed class AppWindow : IbForm
                 BeginInvoke((Action)delegate
                 {
                     ApplyState(status, list);
+                    _ui.SetLoading(false, null);
+                    SetBusy(false, "");
                     if (!_running)
                     {
                         var fail = FailHint(startOut) ?? FailHint(status);
                         if (fail != null) _ui.Sub = fail;
                     }
-                    _ui.SetLoading(false, null);
-                    SetBusy(false, "");
+                    else
+                    {
+                        var restart = RestartHint(status);
+                        if (restart != null) _ui.Sub = restart;
+                    }
+                    _ui.Invalidate();
                 });
             }
             catch {}
@@ -433,6 +457,15 @@ internal sealed class AppWindow : IbForm
             || text.IndexOf("ERROR:", StringComparison.OrdinalIgnoreCase) >= 0
             || text.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0)
             return "Could not start the shield. Close IntelByte and try ON again.";
+        return null;
+    }
+
+    private static string RestartHint(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        if (text.IndexOf("RUNNING UNPROTECTED", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("running unprotected", StringComparison.OrdinalIgnoreCase) >= 0)
+            return "Close and reopen Brave once to enable masking.";
         return null;
     }
 
