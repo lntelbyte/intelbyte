@@ -69,6 +69,8 @@ internal sealed class InputPrompt : IbForm
         if (ico != null) Icon = ico;
         ShowInTaskbar = false;
         KeyPreview = true;
+        AutoValidate = AutoValidate.Disable;
+        CausesValidation = false;
 
         _logo = Program.LoadLogo();
         _fBrand = Program.LoadDetectiveFont(11f);
@@ -92,6 +94,7 @@ internal sealed class InputPrompt : IbForm
         };
         SizeChanged += delegate
         {
+            if (IsDisposed || Disposing) return;
             RebuildFrost();
             LayoutFields();
             Invalidate();
@@ -107,8 +110,9 @@ internal sealed class InputPrompt : IbForm
             Optional = optional,
         };
         box.Box.Font = new Font("Segoe UI", 12.5f);
-        box.Box.GotFocus += delegate { Invalidate(); };
-        box.Box.LostFocus += delegate { Invalidate(); };
+        box.Box.Visible = true;
+        box.Box.GotFocus += delegate { if (!IsDisposed && !Disposing) Invalidate(); };
+        box.Box.LostFocus += delegate { if (!IsDisposed && !Disposing) Invalidate(); };
         return box;
     }
 
@@ -133,22 +137,25 @@ internal sealed class InputPrompt : IbForm
 
     private void RebuildFrost()
     {
+        if (IsDisposed || Disposing || Width < 8 || Height < 8) return;
         if (_bmpW == Width && _bmpH == Height && _frost != null) return;
         if (_frost != null) { _frost.Dispose(); _frost = null; }
         _bmpW = Width;
         _bmpH = Height;
-        _frost = GlassPaint.MakeFrost(Width, Height, _logo);
+        try { _frost = GlassPaint.MakeFrost(Width, Height, _logo); }
+        catch { _frost = null; }
     }
 
     private void OnKeys(object sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Escape)
         {
+            e.Handled = true;
             DialogResult = DialogResult.Cancel;
-            Close();
         }
         else if (e.KeyCode == Keys.Enter)
         {
+            e.Handled = true;
             Accept();
         }
     }
@@ -162,15 +169,23 @@ internal sealed class InputPrompt : IbForm
             return;
         }
         DialogResult = DialogResult.OK;
-        Close();
     }
 
     protected override void OnPaintBackground(PaintEventArgs e) { }
 
     protected override void OnPaint(PaintEventArgs e)
     {
+        if (IsDisposed || Disposing) return;
+        try
+        {
+            PaintCard(e.Graphics);
+        }
+        catch {}
+    }
+
+    private void PaintCard(Graphics g)
+    {
         LayoutFields();
-        var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         g.PixelOffsetMode = PixelOffsetMode.None;
@@ -274,7 +289,6 @@ internal sealed class InputPrompt : IbForm
         if (hot == 0 || hot == 2)
         {
             DialogResult = DialogResult.Cancel;
-            Close();
             return;
         }
         if (e.Y < Header) NativeMethods.DragMove(this);
@@ -303,14 +317,18 @@ internal sealed class InputPrompt : IbForm
     {
         if (disposing)
         {
-            if (_frost != null) { _frost.Dispose(); _frost = null; }
-            if (_logo != null) _logo.Dispose();
-            _fBrand.Dispose();
-            _fTitle.Dispose();
-            _fMeta.Dispose();
-            _fBtn.Dispose();
-            _fNav.Dispose();
+            try
+            {
+                if (_frost != null) { _frost.Dispose(); _frost = null; }
+                if (_logo != null) _logo.Dispose();
+                _fBrand.Dispose();
+                _fTitle.Dispose();
+                _fMeta.Dispose();
+                _fBtn.Dispose();
+                _fNav.Dispose();
+            }
+            catch {}
         }
-        base.Dispose(disposing);
+        try { base.Dispose(disposing); } catch {}
     }
 }

@@ -213,28 +213,32 @@ internal static class Program
     {
         try
         {
-            var asm = Assembly.GetExecutingAssembly();
-            using (var s = asm.GetManifestResourceStream("SpecialElite-Regular.ttf"))
-            {
-                if (s == null) return new Font("Courier New", size, style);
-                var buf = new byte[s.Length];
-                s.Read(buf, 0, buf.Length);
-                var handle = GCHandle.Alloc(buf, GCHandleType.Pinned);
-                try
-                {
-                    var col = new PrivateFontCollection();
-                    col.AddMemoryFont(handle.AddrOfPinnedObject(), buf.Length);
-                    return new Font(col.Families[0], size, style, GraphicsUnit.Point);
-                }
-                finally
-                {
-                    handle.Free();
-                }
-            }
+            EnsureDetective();
+            if (_detective == null || _detective.Families.Length == 0)
+                return new Font("Courier New", size, style);
+            return new Font(_detective.Families[0], size, style, GraphicsUnit.Point);
         }
         catch
         {
             return new Font("Courier New", size, style);
+        }
+    }
+
+    private static PrivateFontCollection _detective;
+    private static GCHandle _detectivePin;
+
+    private static void EnsureDetective()
+    {
+        if (_detective != null) return;
+        var asm = Assembly.GetExecutingAssembly();
+        using (var s = asm.GetManifestResourceStream("SpecialElite-Regular.ttf"))
+        {
+            if (s == null) return;
+            var buf = new byte[s.Length];
+            s.Read(buf, 0, buf.Length);
+            _detectivePin = GCHandle.Alloc(buf, GCHandleType.Pinned);
+            _detective = new PrivateFontCollection();
+            _detective.AddMemoryFont(_detectivePin.AddrOfPinnedObject(), buf.Length);
         }
     }
 }

@@ -20,14 +20,16 @@ if (-not (Test-Path $Font)) {
   curl.exe -L -o $Font 'https://github.com/google/fonts/raw/main/apache/specialelite/SpecialElite-Regular.ttf'
 }
 if (-not (Test-Path $Font)) { throw 'Missing detective font: launcher\SpecialElite-Regular.ttf' }
+$Man = Join-Path $WindowsRoot 'launcher\intelbyte.manifest'
 Write-Host '2/5  Compiling launcher (IntelByte.exe) from current source...'
 $Ico = Join-Path $WindowsRoot 'launcher\intelbyte.ico'
 $Png = Join-Path $WindowsRoot 'launcher\intelbyte-logo.png'
 $LauncherSrc = @(Get-ChildItem (Join-Path $WindowsRoot 'launcher\*.cs') | ForEach-Object { $_.FullName })
-& $Csc /nologo /target:winexe /platform:anycpu /out:$ExePath `
+& $Csc /nologo /optimize /target:winexe /platform:anycpu /out:$ExePath `
   /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
   /reference:System.Core.dll `
   "/win32icon:$Ico" `
+  "/win32manifest:$Man" `
   "/resource:$Ico,intelbyte.ico" `
   "/resource:$Png,intelbyte-logo.png" `
   "/resource:$Font,SpecialElite-Regular.ttf" `
@@ -40,11 +42,13 @@ if (Test-Path $PayloadZip) { Remove-Item $PayloadZip -Force }
 Compress-Archive -Path (Join-Path $DistRoot '*') -DestinationPath $PayloadZip -Force
 
 Write-Host '4/5  Compiling IntelByte-Setup.exe (embedding new payload)...'
-& $Csc /nologo /target:winexe /platform:anycpu /out:$InstallerExe `
+& $Csc /nologo /optimize /target:winexe /platform:anycpu /out:$InstallerExe `
   /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+  "/win32icon:$Ico" `
   "/resource:$PayloadZip,IntelByteSetup.Payload.zip" `
   (Join-Path $WindowsRoot 'installer\Program.cs') `
-  (Join-Path $WindowsRoot 'installer\InstallerForm.cs')
+  (Join-Path $WindowsRoot 'installer\InstallerForm.cs') `
+  (Join-Path $WindowsRoot 'installer\AssemblyInfo.cs')
 if ($LASTEXITCODE -ne 0) { throw 'installer compile failed' }
 
 Write-Host '5/5  Copying to Desktop...'

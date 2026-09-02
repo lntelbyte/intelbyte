@@ -255,7 +255,10 @@ internal sealed class AppWindow : IbForm
 
         using (var dlg = new InputPrompt(kind))
         {
-            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            DialogResult result;
+            try { result = dlg.ShowDialog(this); }
+            catch { return; }
+            if (result != DialogResult.OK) return;
             var real = (dlg.Value ?? "").Trim();
             if (real.Length == 0) return;
             var fake = (dlg.Fake ?? "").Trim();

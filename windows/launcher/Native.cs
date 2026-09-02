@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -29,7 +30,7 @@ internal static class NativeMethods
 
     public static void ClipRoundWindow(Form form)
     {
-        if (form == null || !form.IsHandleCreated) return;
+        if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
         var w = form.Width;
         var h = form.Height;
         if (w < 8 || h < 8) return;
@@ -50,7 +51,7 @@ internal static class NativeMethods
 
     public static void DragMove(Form form)
     {
-        if (form == null || !form.IsHandleCreated) return;
+        if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
         try
         {
             ReleaseCapture();
@@ -68,7 +69,7 @@ internal static class DwmChrome
     private const int DwmwaBorderColor = 34;
     private const int DwmwaCaptionColor = 35;
     private const int DwmwaTextColor = 36;
-    private const int DwmwcpRound = 2;
+    private const int DwmwcpDoNotRound = 1;
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -91,14 +92,14 @@ internal static class DwmChrome
 
     private static void ApplyHandle(Form form)
     {
-        if (form == null || !form.IsHandleCreated) return;
+        if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
         try
         {
             var hwnd = form.Handle;
             var dark = 1;
             DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref dark, 4);
             DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkModeBefore20H1, ref dark, 4);
-            var round = DwmwcpRound;
+            var round = DwmwcpDoNotRound;
             var caption = ColorTranslator.ToWin32(AppTheme.Bg);
             var border = ColorTranslator.ToWin32(AppTheme.Bg);
             var text = ColorTranslator.ToWin32(Color.White);
@@ -123,7 +124,7 @@ internal class IbForm : Form
         SetStyle(ControlStyles.ResizeRedraw, true);
         DwmChrome.Apply(this);
         HandleCreated += delegate { ApplyGlassAndCorners(); };
-        SizeChanged += delegate { ApplyGlassAndCorners(); };
+        SizeChanged += delegate { ClipCorners(); };
         Shown += delegate
         {
             ApplyGlassAndCorners();
@@ -131,36 +132,55 @@ internal class IbForm : Form
             ReclipLater(250);
         };
         Opacity = 0.94;
+        FormClosing += OnIbClosing;
+    }
+
+    private readonly List<Timer> _reclip = new List<Timer>();
+
+    private void OnIbClosing(object sender, FormClosingEventArgs e)
+    {
+        foreach (var t in _reclip.ToArray())
+        {
+            try { t.Stop(); t.Dispose(); } catch {}
+        }
+        _reclip.Clear();
     }
 
     private void ReclipLater(int ms)
     {
         var later = new Timer { Interval = ms };
-        later.Tick += delegate { later.Stop(); later.Dispose(); ApplyGlassAndCorners(); };
+        _reclip.Add(later);
+        later.Tick += delegate
+        {
+            later.Stop();
+            later.Dispose();
+            _reclip.Remove(later);
+            ApplyGlassAndCorners();
+        };
         later.Start();
     }
 
     private bool _applying;
     private void ApplyGlassAndCorners()
     {
-        if (_applying || !IsHandleCreated) return;
+        if (_applying || IsDisposed || Disposing || !IsHandleCreated || !Visible) return;
         _applying = true;
         try
         {
             DwmGlass.Apply(this);
             NativeMethods.ClipRoundWindow(this);
         }
+        catch {}
         finally { _applying = false; }
     }
 
-    protected override CreateParams CreateParams
+    private void ClipCorners()
     {
-        get
-        {
-            var cp = base.CreateParams;
-            cp.ClassStyle |= 0x00020000;
-            return cp;
-        }
+        if (_applying || IsDisposed || Disposing || !IsHandleCreated || !Visible) return;
+        _applying = true;
+        try { NativeMethods.ClipRoundWindow(this); }
+        catch {}
+        finally { _applying = false; }
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
@@ -196,7 +216,7 @@ internal static class DwmGlass
 
     public static void Apply(Form form)
     {
-        if (form == null || !form.IsHandleCreated) return;
+        if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
         var color = unchecked((int)0xB8141418);
         if (!SetAccent(form.Handle, AccentAcrylic, color))
             SetAccent(form.Handle, AccentBlurBehind, color);
@@ -251,7 +271,7 @@ internal static class StreamCapture
 
     private static void Apply(Form form)
     {
-        if (form == null || !form.IsHandleCreated) return;
+        if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
         try { SetWindowDisplayAffinity(form.Handle, WdaExcludeFromCapture); }
         catch {}
     }

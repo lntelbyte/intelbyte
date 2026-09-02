@@ -232,9 +232,13 @@ internal static class UiShapes
 
     public static void ApplyRoundedRegion(Control c, int radius)
     {
-        if (c.Width < 8 || c.Height < 8) return;
-        using (var path = RoundedRect(new Rectangle(0, 0, c.Width, c.Height), radius))
-            c.Region = new Region(path);
+        if (c == null || c.IsDisposed || c.Width < 8 || c.Height < 8) return;
+        try
+        {
+            using (var path = RoundedRect(new Rectangle(0, 0, c.Width, c.Height), radius))
+                c.Region = new Region(path);
+        }
+        catch {}
     }
 }
 
@@ -262,6 +266,7 @@ internal class BareField : TextBox
         Multiline = true;
         AcceptsReturn = false;
         WordWrap = false;
+        CausesValidation = false;
     }
 
     protected override void OnKeyPress(KeyPressEventArgs e)
@@ -289,7 +294,7 @@ internal class BareField : TextBox
 
     public void PadText()
     {
-        if (!IsHandleCreated || Width < 8 || Height < 8) return;
+        if (IsDisposed || !IsHandleCreated || Width < 8 || Height < 8) return;
         var line = Math.Max(12, Font.Height);
         var top = Math.Max(0, (Height - line) / 2);
         var rc = new RECT { Left = 14, Top = top, Right = Math.Max(15, Width - 8), Bottom = Height - 2 };
@@ -348,10 +353,10 @@ internal sealed class GlassField : Panel
             Visible = false,
         };
         Controls.Add(Box);
-        Box.GotFocus += delegate { ShowBox(); Invalidate(); };
-        Box.LostFocus += delegate { HideBoxIfEmpty(); Invalidate(); };
-        Box.TextChanged += delegate { HideBoxIfEmpty(); Invalidate(); };
-        SizeChanged += delegate { LayoutInner(); };
+        Box.GotFocus += delegate { if (!IsDisposed && !Disposing) { ShowBox(); Invalidate(); } };
+        Box.LostFocus += delegate { if (!IsDisposed && !Disposing) { HideBoxIfEmpty(); Invalidate(); } };
+        Box.TextChanged += delegate { if (!IsDisposed && !Disposing) { HideBoxIfEmpty(); Invalidate(); } };
+        SizeChanged += delegate { if (!IsDisposed && !Disposing) LayoutInner(); };
     }
 
     private Rectangle PlusRect
@@ -373,12 +378,17 @@ internal sealed class GlassField : Panel
 
     private void HideBoxIfEmpty()
     {
+        if (IsDisposed || Disposing || Box == null || Box.IsDisposed) return;
+        if (!string.IsNullOrEmpty(Kicker)) return;
+        var host = FindForm();
+        if (host != null && (host.Disposing || host.IsDisposed || !host.Visible)) return;
         if (Box.Focused || HasText) return;
-        Box.Visible = false;
+        try { Box.Visible = false; } catch {}
     }
 
     private void LayoutInner()
     {
+        if (IsDisposed || Disposing || Width < 8 || Height < 8) return;
         UiShapes.ApplyRoundedRegion(this, Math.Min(12, Math.Max(4, Height / 2)));
         if (ShowPlus)
             Box.Bounds = new Rectangle(0, 0, Math.Max(8, Width - Height), Height);
@@ -391,6 +401,7 @@ internal sealed class GlassField : Panel
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
+        if (IsDisposed || Disposing || Width < 2 || Height < 2) return;
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using (var path = UiShapes.RoundedRect(new Rectangle(0, 0, Math.Max(0, Width - 1), Math.Max(0, Height - 1)), Math.Min(12, Math.Max(4, Height / 2))))
@@ -400,6 +411,7 @@ internal sealed class GlassField : Panel
 
     protected override void OnPaint(PaintEventArgs e)
     {
+        if (IsDisposed || Disposing || Box == null || Box.IsDisposed) return;
         LayoutInner();
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -498,10 +510,16 @@ internal sealed class GlassField : Panel
     {
         if (disposing)
         {
-            _kicker.Dispose();
-            _ghost.Dispose();
+            try
+            {
+                if (Box != null && !Box.IsDisposed && object.ReferenceEquals(Box.Font, _ghost))
+                    Box.Font = SystemFonts.MessageBoxFont;
+            }
+            catch {}
+            try { _kicker.Dispose(); } catch {}
+            try { _ghost.Dispose(); } catch {}
         }
-        base.Dispose(disposing);
+        try { base.Dispose(disposing); } catch {}
     }
 }
 
