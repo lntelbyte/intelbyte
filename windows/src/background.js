@@ -165,10 +165,18 @@ export async function runBackgroundWorker() {
     snapshot({ type: 'active' });
   }
 
+  // A pending Promise alone does not keep Node's event loop alive. Keep the
+  // worker running even before the user adds entries or wires an app, so the
+  // GUI can turn protection on and remain ready for setup.
+  const idleKeepAlive = handle ? null : setInterval(() => {}, 60_000);
+
   const shutdown = () => {
     logLine('shield-bg stopping');
     try {
       if (handle) handle.stop();
+    } catch {}
+    try {
+      if (idleKeepAlive) clearInterval(idleKeepAlive);
     } catch {}
     try {
       unlinkSync(PID_FILE);
