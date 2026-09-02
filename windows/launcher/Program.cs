@@ -14,6 +14,23 @@ internal static class Program
 {
     private const int AttachParentProcess = -1;
 
+    internal static string AppVersion
+    {
+        get
+        {
+            try
+            {
+                var asm = Assembly.GetExecutingAssembly();
+                var info = (AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(
+                    asm, typeof(AssemblyInformationalVersionAttribute));
+                if (info != null && !string.IsNullOrEmpty(info.InformationalVersion))
+                    return info.InformationalVersion;
+                return asm.GetName().Version != null ? asm.GetName().Version.ToString(3) : "0.0.0";
+            }
+            catch { return "0.0.0"; }
+        }
+    }
+
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool AttachConsole(int dwProcessId);
 

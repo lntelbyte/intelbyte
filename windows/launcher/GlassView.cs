@@ -244,7 +244,7 @@ internal sealed class GlassView : Control
         var bottom = _card.Bottom - Pad;
 
         _rLogo = new Rectangle(left, top, Logo, Logo);
-        var linkY = top + Logo + 62;
+        var linkY = top + Logo + 80;
         _rSite = new Rectangle(left, linkY, 88, 18);
         _rDisc = new Rectangle(left, linkY + 18, 150, 18);
         _rOff = new Rectangle(left, linkY + 44, ToggleW / 2, ToggleH);
@@ -344,6 +344,9 @@ internal sealed class GlassView : Control
         TextRenderer.DrawText(g, "Screen privacy", _fMeta,
             new Rectangle(_rLogo.X, brandY + 26, LeftW, 18), Color.FromArgb(150, 150, 154),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        TextRenderer.DrawText(g, "v" + Program.AppVersion, _fMeta,
+            new Rectangle(_rLogo.X, brandY + 44, LeftW, 16), Color.FromArgb(125, 125, 130),
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
 
         var siteCol = _hot == 7 ? Color.White : Color.FromArgb(170, 170, 174);
         var discCol = _hot == 8 ? Color.White : Color.FromArgb(170, 170, 174);
