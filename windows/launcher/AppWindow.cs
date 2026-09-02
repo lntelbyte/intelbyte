@@ -102,6 +102,9 @@ internal sealed class AppWindow : IbForm
         _bootDone = true;
         _ui.Startup = StartupEnabled();
         AutoStart();
+        // Start the update check independently of the shield boot callback. The
+        // shield can take a while on a first run, and should not delay updates.
+        BeginUpdateCheck();
         if (_startMinimized) HideToTray();
     }
 
@@ -225,6 +228,7 @@ internal sealed class AppWindow : IbForm
             {
                 BeginInvoke((Action)delegate
                 {
+                    if (_updateInstalling) return;
                     ApplyState(status, list);
                     _ui.SetLoading(false, null);
                     SetBusy(false, "");
@@ -588,7 +592,7 @@ internal sealed class AppWindow : IbForm
             {
                 var status = Program.RunCli(_node, _bin, _app, new[] { "status" });
                 var list = Program.RunCli(_node, _bin, _app, new[] { "list", "--reveal" });
-                try { BeginInvoke((Action)delegate { ApplyState(status, list); }); }
+                try { BeginInvoke((Action)delegate { if (!_updateInstalling) ApplyState(status, list); }); }
                 catch {}
             }
             finally { _refreshing = false; }
