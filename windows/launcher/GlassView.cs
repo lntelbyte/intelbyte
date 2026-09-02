@@ -40,8 +40,26 @@ internal sealed class GlassView : Control
     public string Status = "Off";
     public string Count = "0";
     public string Foot = "";
-    public bool Startup;
-    public bool StreamProof;
+    private bool _startup;
+    public bool Startup
+    {
+        get { return _startup; }
+        set
+        {
+            _startup = value;
+            if (_startSwitch != null) _startSwitch.On = value;
+        }
+    }
+    private bool _streamProof;
+    public bool StreamProof
+    {
+        get { return _streamProof; }
+        set
+        {
+            _streamProof = value;
+            if (_proofSwitch != null) _proofSwitch.On = value;
+        }
+    }
     public bool Busy;
     public bool Loading;
     public string LoadText = "Turning on";
@@ -59,6 +77,8 @@ internal sealed class GlassView : Control
     private readonly Image _logo;
     private readonly GlassField _search;
     private readonly OnOffSwitch _switch;
+    private readonly OnOffSwitch _proofSwitch;
+    private readonly OnOffSwitch _startSwitch;
     private Bitmap _frost;
     private int _bmpW, _bmpH;
     private int _hot = -1;
@@ -106,6 +126,16 @@ internal sealed class GlassView : Control
         _switch.Toggled += delegate { if (ToggleClick != null) ToggleClick(this, EventArgs.Empty); };
         Controls.Add(_switch);
         _switch.BringToFront();
+        _proofSwitch = new OnOffSwitch(96, 30);
+        _proofSwitch.AccessibleName = "Stream proof on or off";
+        _proofSwitch.Toggled += delegate { if (StreamProofClick != null) StreamProofClick(this, EventArgs.Empty); };
+        Controls.Add(_proofSwitch);
+        _proofSwitch.BringToFront();
+        _startSwitch = new OnOffSwitch(96, 30);
+        _startSwitch.AccessibleName = "Auto-start on or off";
+        _startSwitch.Toggled += delegate { if (StartupClick != null) StartupClick(this, EventArgs.Empty); };
+        Controls.Add(_startSwitch);
+        _startSwitch.BringToFront();
         SetLoading(true, "Turning on");
     }
 
@@ -134,6 +164,8 @@ internal sealed class GlassView : Control
             if (_frost == null) RebuildAtmosphere();
         }
         if (_switch != null) _switch.Visible = !on;
+        if (_proofSwitch != null) _proofSwitch.Visible = !on;
+        if (_startSwitch != null) _startSwitch.Visible = !on;
         Invalidate();
     }
 
@@ -178,6 +210,8 @@ internal sealed class GlassView : Control
         _search.Bounds = _rBar;
         _search.Busy = Busy;
         _search.Visible = !Loading;
+        if (_proofSwitch != null) _proofSwitch.Visible = !Loading;
+        if (_startSwitch != null) _startSwitch.Visible = !Loading;
         if (!Loading && (_bmpW != Width || _bmpH != Height))
             RebuildAtmosphere();
         Invalidate();
@@ -227,9 +261,26 @@ internal sealed class GlassView : Control
         _rAdd = new Rectangle(_rBar.Right - Add, _rBar.Y, Add, Add);
         _rField = new Rectangle(_rBar.X, _rBar.Y, _rBar.Width - Add, Add);
         _rList = new Rectangle(right, top + Add + Pad, rightW, bottom - Row - (top + Add + Pad));
-        _rStart = new Rectangle(right, bottom - Row, rightW, Row);
-        _rProof = new Rectangle(left, bottom - Row, LeftW, Row);
+        const int settingW = 96;
+        const int settingGap = 12;
+        var settingY = bottom - 3 - 30;
+        _rStart = new Rectangle(right, bottom - Row, Math.Max(40, rightW - settingW - settingGap), Row);
+        _rProof = new Rectangle(left, bottom - Row, Math.Max(40, LeftW - settingW - settingGap), Row);
         _rFoot = new Rectangle(left, _rProof.Y - 18, LeftW, 18);
+        if (_proofSwitch != null)
+        {
+            _proofSwitch.Bounds = new Rectangle(left + LeftW - settingW, settingY, settingW, 30);
+            _proofSwitch.On = StreamProof;
+            _proofSwitch.Visible = !Loading;
+            _proofSwitch.BringToFront();
+        }
+        if (_startSwitch != null)
+        {
+            _startSwitch.Bounds = new Rectangle(right + rightW - settingW, settingY, settingW, 30);
+            _startSwitch.On = Startup;
+            _startSwitch.Visible = !Loading;
+            _startSwitch.BringToFront();
+        }
     }
 
     protected override void OnPaintBackground(PaintEventArgs pevent) { }
@@ -316,14 +367,12 @@ internal sealed class GlassView : Control
         TextRenderer.DrawText(g, foot, _fMeta, _rFoot, Color.FromArgb(168, 168, 172),
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
 
-        var startCol = _hot == 4 ? Color.White : Color.FromArgb(186, 186, 190);
-        TextRenderer.DrawText(g, Startup ? "Auto-start when PC turns on  ·  On" : "Auto-start when PC turns on  ·  Off",
-            _fMeta, _rStart, startCol,
-            TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+        var startCol = _hot == 4 ? Color.White : Color.FromArgb(205, 205, 210);
+        TextRenderer.DrawText(g, "Auto-start when PC turns on", _fMeta, _rStart, startCol,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
 
-        var proofCol = _hot == 9 ? Color.White : Color.FromArgb(186, 186, 190);
-        TextRenderer.DrawText(g, StreamProof ? "Stream proof  ·  On" : "Stream proof  ·  Off",
-            _fMeta, _rProof, proofCol,
+        var proofCol = _hot == 9 ? Color.White : Color.FromArgb(205, 205, 210);
+        TextRenderer.DrawText(g, "Stream proof", _fMeta, _rProof, proofCol,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
     }
 
@@ -442,8 +491,6 @@ internal sealed class GlassView : Control
             if (_card.Contains(e.Location)) NativeMethods.DragMove(FindForm());
             return;
         }
-        if (hot == 4) { if (StartupClick != null) StartupClick(this, EventArgs.Empty); return; }
-        if (hot == 9) { if (StreamProofClick != null) StreamProofClick(this, EventArgs.Empty); return; }
         if (hot == 7) { OpenUrl("https://intelbyte.cc"); return; }
         if (hot == 8) { OpenUrl("https://discord.gg/intelbyte"); return; }
         if (hot == 5 || hot == 6 || InToggleRail(e.Location))
@@ -488,8 +535,6 @@ internal sealed class GlassView : Control
         if (_rClose.Contains(pt)) return 0;
         if (_rMin.Contains(pt)) return 1;
         if (_rGreen.Contains(pt)) return 2;
-        if (_rStart.Contains(pt)) return 4;
-        if (_rProof.Contains(pt)) return 9;
         if (_rSite.Contains(pt)) return 7;
         if (_rDisc.Contains(pt)) return 8;
         for (var i = 0; i < _nav.Length; i++)
@@ -546,13 +591,25 @@ internal sealed class GlassView : Control
 
 internal sealed class OnOffSwitch : Control
 {
-    public bool On;
+    private bool _on;
+    public bool On
+    {
+        get { return _on; }
+        set
+        {
+            if (_on == value) return;
+            _on = value;
+            Invalidate();
+        }
+    }
     public event EventHandler Toggled;
     private readonly Font _font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
     private bool _hover;
     private bool _pressed;
 
-    public OnOffSwitch()
+    public OnOffSwitch() : this(GlassView.ToggleW, GlassView.ToggleH) {}
+
+    public OnOffSwitch(int width, int height)
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
@@ -561,7 +618,7 @@ internal sealed class OnOffSwitch : Control
         AccessibleName = "IntelByte protection on or off";
         AccessibleRole = AccessibleRole.PushButton;
         BackColor = Color.FromArgb(28, 28, 32);
-        Size = new Size(GlassView.ToggleW, GlassView.ToggleH);
+        Size = new Size(width, height);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -622,7 +679,7 @@ internal sealed class OnOffSwitch : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         var pill = new Rectangle(1, 1, Width - 3, Height - 3);
-        var radius = Math.Max(8, Height / 2);
+        var radius = Math.Max(8, Math.Min(pill.Width, pill.Height) / 2);
         var trackColor = On
             ? (_hover ? Color.FromArgb(37, 84, 64) : Color.FromArgb(31, 67, 53))
             : (_hover ? Color.FromArgb(48, 50, 60) : Color.FromArgb(36, 38, 46));
@@ -632,7 +689,7 @@ internal sealed class OnOffSwitch : Control
         using (var shadowPath = UiShapes.RoundedRect(shadow, radius))
         using (var shadowFill = new SolidBrush(Color.FromArgb(80, 0, 0, 0)))
             g.FillPath(shadowFill, shadowPath);
-        using (var track = UiShapes.RoundedRect(pill, Height / 2))
+        using (var track = UiShapes.RoundedRect(pill, radius))
         using (var trackFill = new SolidBrush(trackColor))
             g.FillPath(trackFill, track);
         var half = Width / 2;
@@ -648,8 +705,8 @@ internal sealed class OnOffSwitch : Control
         using (var thumbEdge = new Pen(On ? Color.FromArgb(115, 193, 158) : Color.FromArgb(190, 190, 198), 1f))
         using (var thumbOutline = UiShapes.RoundedRect(thumb, Math.Max(6, (Height - 8) / 2)))
             g.DrawPath(thumbEdge, thumbOutline);
-        using (var ring = new Pen(On ? Color.FromArgb(130, 112, 235, 166) : Color.FromArgb(90, 255, 255, 255)))
-        using (var outline = UiShapes.RoundedRect(pill, Height / 2))
+        using (var ring = new Pen(On ? Color.FromArgb(180, 112, 235, 166) : Color.FromArgb(150, 210, 212, 220)))
+        using (var outline = UiShapes.RoundedRect(pill, radius))
             g.DrawPath(ring, outline);
         var dot = new Rectangle(On ? Width - 22 : 11, Height / 2 - 3, 6, 6);
         using (var dotFill = new SolidBrush(On ? Color.FromArgb(20, 92, 61) : Color.FromArgb(126, 128, 138)))
@@ -665,7 +722,7 @@ internal sealed class OnOffSwitch : Control
             var focus = pill;
             focus.Inflate(-2, -2);
             using (var focusPen = new Pen(Color.FromArgb(190, 255, 255, 255), 1f))
-            using (var focusPath = UiShapes.RoundedRect(focus, Math.Max(6, Height / 2 - 3)))
+            using (var focusPath = UiShapes.RoundedRect(focus, Math.Min(focus.Width, focus.Height) / 2))
                 g.DrawPath(focusPen, focusPath);
         }
     }
