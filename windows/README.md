@@ -54,15 +54,20 @@ edits (undone by `unsetup`) and a startup entry (undone by `uninstall`).
 
 No Node.js required.
 
-1. Get `IntelByte-Windows.zip` from [Releases](https://github.com/lntelbyte/intelbyte/releases) or build it:
+1. Get `IntelByte-Setup.exe` from [Releases](https://github.com/lntelbyte/intelbyte/releases) or build it:
 
    ```powershell
    cd windows
    npm install
-   npm run build:exe
+   npm run build:installer
    ```
 
-2. Unzip and run commands from that folder:
+2. Unzip. Double-click `IntelByte.exe`. If Windows Smart App Control blocks it
+   (“malicious software”), that is a false positive on an unsigned new app.
+   Right-click the exe → Properties → Unblock, then try again. A code-signed
+   build is what actually stops this.
+
+3. Or run commands from that folder:
 
    ```powershell
    .\IntelByte.exe protect-mail you@example.com

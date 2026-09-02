@@ -37,10 +37,16 @@ if (-not (Test-Path $NodeZip)) {
   Invoke-WebRequest -Uri $NodeUrl -OutFile $NodeZip -UseBasicParsing
 }
 $NodeExtract = Join-Path $env:TEMP "node-$NodeVersion-win-x64"
-if (-not (Test-Path $NodeExtract)) {
+$bundledNode = Join-Path $NodeExtract 'node.exe'
+if (-not (Test-Path $bundledNode)) {
   Expand-Archive -Path $NodeZip -DestinationPath $env:TEMP -Force
 }
-Copy-Item (Join-Path $NodeExtract 'node.exe') (Join-Path $NodeDir 'node.exe') -Force
+if (-not (Test-Path $bundledNode)) {
+  $found = Get-ChildItem $NodeExtract -Recurse -Filter node.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($found) { $bundledNode = $found.FullName }
+}
+if (-not (Test-Path $bundledNode)) { throw "node.exe not found after extracting $NodeZip" }
+Copy-Item $bundledNode (Join-Path $NodeDir 'node.exe') -Force
 
 # Package launcher as IntelByte.exe (C# — no Node/pkg needed on build machine)
 & (Join-Path $WindowsRoot 'scripts\prepare-logo.ps1')
@@ -54,13 +60,15 @@ if (-not (Test-Path $Csc)) {
 $LauncherIco = Join-Path $WindowsRoot 'launcher\intelbyte.ico'
 $LauncherPng = Join-Path $WindowsRoot 'launcher\intelbyte-logo.png'
 $LauncherFont = Join-Path $WindowsRoot 'launcher\SpecialElite-Regular.ttf'
+$LauncherManifest = Join-Path $WindowsRoot 'launcher\intelbyte.manifest'
 $LauncherSrc = @(Get-ChildItem (Join-Path $WindowsRoot 'launcher\*.cs') | ForEach-Object { $_.FullName })
-& $Csc /nologo /target:winexe /platform:anycpu /out:$ExePath `
+& $Csc /nologo /optimize /target:winexe /platform:anycpu /out:$ExePath `
   /reference:System.dll `
   /reference:System.Drawing.dll `
   /reference:System.Windows.Forms.dll `
   /reference:System.Core.dll `
   "/win32icon:$LauncherIco" `
+  "/win32manifest:$LauncherManifest" `
   "/resource:$LauncherIco,intelbyte.ico" `
   "/resource:$LauncherPng,intelbyte-logo.png" `
   "/resource:$LauncherFont,SpecialElite-Regular.ttf" `

@@ -1,6 +1,6 @@
 # intelbyte
 
-**Download (Windows):** [IntelByte-Windows.zip](https://github.com/lntelbyte/intelbyte/releases/latest/download/IntelByte-Windows.zip) — no Node install required.
+**Download (Windows):** [IntelByte-Setup.exe](https://github.com/lntelbyte/intelbyte/releases/latest/download/IntelByte-Setup.exe) — one file, no Node install.
 
 Hide your email and phone number on screen while you stream or share your screen.
 
@@ -76,7 +76,11 @@ intelbyte                                  # 3. run it while you stream
 
 1. Download or build the release zip from the [`windows`](./windows) folder.
 2. Unzip `IntelByte-Windows.zip`.
-3. Open PowerShell in that folder and run:
+3. Double-click `IntelByte.exe`. If Windows Smart App Control / SmartScreen
+   blocks it, that is because this build is not yet Authenticode-signed — not
+   because the zip is broken. Right-click the exe → Properties → Unblock, then
+   open it again. Do not turn off Smart App Control unless you trust this file.
+4. Or run commands from that folder:
 
 ```powershell
 .\IntelByte.exe protect-mail you@example.com

@@ -32,11 +32,14 @@ $refs = @(
 
 $src = @(
   (Join-Path $WindowsRoot 'installer\Program.cs'),
-  (Join-Path $WindowsRoot 'installer\InstallerForm.cs')
+  (Join-Path $WindowsRoot 'installer\InstallerForm.cs'),
+  (Join-Path $WindowsRoot 'installer\AssemblyInfo.cs')
 )
+$ico = Join-Path $WindowsRoot 'launcher\intelbyte.ico'
 
-& $Csc /nologo /target:winexe /platform:anycpu /out:$InstallerExe `
+& $Csc /nologo /optimize /target:winexe /platform:anycpu /out:$InstallerExe `
   $refs `
+  "/win32icon:$ico" `
   "/resource:$PayloadZip,IntelByteSetup.Payload.zip" `
   $src
 
