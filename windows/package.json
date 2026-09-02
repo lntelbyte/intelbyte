@@ -1,6 +1,6 @@
 {
   "name": "intelbyte",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "Windows background app that redacts your email & phone on screen across every CDP app (Discord, browsers, any Electron app). Runs hidden with a tray icon. OPSEC for streaming — no extensions, no client mods.",
   "type": "module",
   "bin": {

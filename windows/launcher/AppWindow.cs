@@ -73,6 +73,8 @@ internal sealed class AppWindow : IbForm
         _ui.Field.KeyDown += AddFieldKeyDown;
         Controls.Add(_ui);
 
+        Load += delegate { BeginUpdateCheck(); };
+
         SetupTray();
 
         _refreshTimer = new System.Windows.Forms.Timer { Interval = 5000 };
@@ -267,7 +269,7 @@ internal sealed class AppWindow : IbForm
                 {
                     BeginInvoke((Action)delegate
                     {
-                        if (!_updateInstalling && !_busy) StartUpdate(update);
+                        if (!_updateInstalling) StartUpdate(update);
                     });
                 }
                 catch {}
