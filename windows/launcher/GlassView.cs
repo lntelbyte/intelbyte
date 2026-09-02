@@ -101,13 +101,12 @@ internal sealed class GlassView : Control
         _search.Box.GotFocus += delegate { Invalidate(); };
         _search.Box.LostFocus += delegate { Invalidate(); };
         _search.Box.TextChanged += delegate { Invalidate(); };
-        _search.Visible = true;
-
+        _search.Visible = false;
         _switch = new OnOffSwitch();
         _switch.Toggled += delegate { if (ToggleClick != null) ToggleClick(this, EventArgs.Empty); };
         Controls.Add(_switch);
         _switch.BringToFront();
-        SetLoading(false, null);
+        SetLoading(true, "Turning on");
     }
 
     public void SetLoading(bool on, string text)
@@ -134,6 +133,7 @@ internal sealed class GlassView : Control
             if (_spin != null) _spin.Stop();
             if (_frost == null) RebuildAtmosphere();
         }
+        if (_switch != null) _switch.Visible = !on;
         Invalidate();
     }
 
@@ -236,7 +236,15 @@ internal sealed class GlassView : Control
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        var g = e.Graphics;
+        try
+        {
+            PaintCard(e.Graphics);
+        }
+        catch {}
+    }
+
+    private void PaintCard(Graphics g)
+    {
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         g.PixelOffsetMode = PixelOffsetMode.None;
@@ -515,7 +523,8 @@ internal sealed class GlassView : Control
         _bmpW = Width;
         _bmpH = Height;
         if (Width < 8 || Height < 8) return;
-        _frost = GlassPaint.MakeFrost(Width, Height, _logo);
+        try { _frost = GlassPaint.MakeFrost(Width, Height, _logo); }
+        catch { _frost = null; }
     }
 
     protected override void Dispose(bool disposing)

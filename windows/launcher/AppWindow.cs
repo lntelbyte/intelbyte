@@ -171,6 +171,7 @@ internal sealed class AppWindow : IbForm
 
     private void BootOn()
     {
+        _ui.SetLoading(true, "Turning on");
         ThreadPool.QueueUserWorkItem(delegate
         {
             var startOut = "";
@@ -193,6 +194,7 @@ internal sealed class AppWindow : IbForm
                         var fail = FailHint(startOut) ?? FailHint(status);
                         if (fail != null) _ui.Sub = fail;
                     }
+                    _ui.SetLoading(false, null);
                     SetBusy(false, "");
                 });
             }
@@ -430,7 +432,7 @@ internal sealed class AppWindow : IbForm
         if (text.IndexOf("IB_STATE=failed", StringComparison.OrdinalIgnoreCase) >= 0
             || text.IndexOf("ERROR:", StringComparison.OrdinalIgnoreCase) >= 0
             || text.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0)
-            return "Could not start. Windows may be blocking node.exe.";
+            return "Could not start the shield. Close IntelByte and try ON again.";
         return null;
     }
 

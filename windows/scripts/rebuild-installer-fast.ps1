@@ -37,13 +37,24 @@ $LauncherSrc = @(Get-ChildItem (Join-Path $WindowsRoot 'launcher\*.cs') | ForEac
 if ($LASTEXITCODE -ne 0) { throw 'launcher compile failed' }
 Write-Host ("      launcher size: {0} bytes" -f (Get-Item $ExePath).Length)
 
-Write-Host '3/5  Rebuilding payload.zip (flat: IntelByte.exe, app\, node\ at root)...'
+Write-Host '3/5  Syncing app source, then rebuilding payload.zip...'
+$AppDir = Join-Path $DistRoot 'app'
+foreach ($item in @('bin', 'src')) {
+  $src = Join-Path $WindowsRoot $item
+  $dst = Join-Path $AppDir $item
+  if (-not (Test-Path $src)) { throw "Missing $src" }
+  if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+  Copy-Item $src $dst -Recurse -Force
+}
 if (Test-Path $PayloadZip) { Remove-Item $PayloadZip -Force }
 Compress-Archive -Path (Join-Path $DistRoot '*') -DestinationPath $PayloadZip -Force
 
 Write-Host '4/5  Compiling IntelByte-Setup.exe (embedding new payload)...'
+$FwDir = Split-Path $Csc
 & $Csc /nologo /optimize /target:winexe /platform:anycpu /out:$InstallerExe `
   /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll `
+  "/reference:$(Join-Path $FwDir 'System.IO.Compression.dll')" `
+  "/reference:$(Join-Path $FwDir 'System.IO.Compression.FileSystem.dll')" `
   "/win32icon:$Ico" `
   "/resource:$PayloadZip,IntelByteSetup.Payload.zip" `
   (Join-Path $WindowsRoot 'installer\Program.cs') `

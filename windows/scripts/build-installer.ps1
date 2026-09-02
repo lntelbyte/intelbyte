@@ -24,10 +24,13 @@ if (-not (Test-Path $Csc)) {
   throw 'csc.exe not found. Install .NET Framework.'
 }
 
+$FwDir = Split-Path $Csc
 $refs = @(
   '/reference:System.dll',
   '/reference:System.Drawing.dll',
-  '/reference:System.Windows.Forms.dll'
+  '/reference:System.Windows.Forms.dll',
+  "/reference:$(Join-Path $FwDir 'System.IO.Compression.dll')",
+  "/reference:$(Join-Path $FwDir 'System.IO.Compression.FileSystem.dll')"
 )
 
 $src = @(

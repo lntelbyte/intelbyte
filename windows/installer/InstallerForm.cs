@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -267,8 +268,10 @@ namespace IntelByteSetup
             }
 
             var appExe = Path.Combine(targetDir, "IntelByte.exe");
-            if (!File.Exists(appExe))
-                throw new InvalidOperationException("Install package is incomplete (IntelByte.exe missing).");
+            var nodeExe = Path.Combine(targetDir, "node", "node.exe");
+            var binJs = Path.Combine(targetDir, "app", "bin", "intelbyte.js");
+            if (!File.Exists(appExe) || !File.Exists(nodeExe) || !File.Exists(binJs))
+                throw new InvalidOperationException("Install package is incomplete. Re-download IntelByte-Setup.exe.");
 
             SetStatus("Creating shortcuts…", 88);
             if (desktopShortcut)
@@ -341,33 +344,33 @@ namespace IntelByteSetup
 
         private static void ExtractZip(string zipPath, string destDir)
         {
-            var shellType = Type.GetTypeFromProgID("Shell.Application");
-            if (shellType == null)
-                throw new InvalidOperationException("Windows Shell is unavailable.");
-
-            var shell = Activator.CreateInstance(shellType);
-            var zip = shellType.InvokeMember("NameSpace", BindingFlags.InvokeMethod, null, shell, new object[] { zipPath });
-            var dest = shellType.InvokeMember("NameSpace", BindingFlags.InvokeMethod, null, shell, new object[] { destDir });
-            if (zip == null) throw new InvalidOperationException("Could not open install package.");
-            if (dest == null) throw new InvalidOperationException("Could not open install folder.");
-
-            var items = zip.GetType().InvokeMember("Items", BindingFlags.InvokeMethod, null, zip, null);
-            const int noProgress = 4;
-            const int yesToAll = 16;
-            dest.GetType().InvokeMember(
-                "CopyHere",
-                BindingFlags.InvokeMethod,
-                null,
-                dest,
-                new object[] { items, noProgress | yesToAll });
-
-            for (var i = 0; i < 120; i++)
+            var root = Path.GetFullPath(destDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            using (var zip = ZipFile.OpenRead(zipPath))
             {
-                Thread.Sleep(500);
-                if (Directory.GetFiles(destDir, "*", SearchOption.AllDirectories).Length > 5)
-                    return;
+                foreach (var entry in zip.Entries)
+                {
+                    var rel = entry.FullName.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+                    if (rel.Length == 0) continue;
+                    while (rel.StartsWith("." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                        rel = rel.Substring(2);
+                    if (rel.IndexOf("..", StringComparison.Ordinal) >= 0) continue;
+
+                    var dest = Path.GetFullPath(Path.Combine(destDir, rel));
+                    if (!dest.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    if (string.IsNullOrEmpty(entry.Name)
+                        || rel.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+                    {
+                        Directory.CreateDirectory(dest);
+                        continue;
+                    }
+
+                    var parent = Path.GetDirectoryName(dest);
+                    if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+                    entry.ExtractToFile(dest, true);
+                }
             }
-            throw new InvalidOperationException("Extract timed out. Try again.");
         }
 
         private static void CreateShortcut(string shortcutPath, string targetExe, string workingDir, string description)

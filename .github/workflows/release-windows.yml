@@ -20,15 +20,17 @@ jobs:
           cache: npm
           cache-dependency-path: windows/package-lock.json
 
-      - name: Build portable zip
+      - name: Build Windows packages
         shell: pwsh
         run: |
           Set-Location windows
           npm ci
-          powershell -ExecutionPolicy Bypass -File scripts/build-release.ps1
+          powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1
 
       - name: Upload GitHub Release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: windows/dist/IntelByte-Windows.zip
+          files: |
+            windows/dist/IntelByte-Windows.zip
+            windows/dist/IntelByte-Setup.exe
           generate_release_notes: true
