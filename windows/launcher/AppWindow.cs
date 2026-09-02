@@ -165,13 +165,12 @@ internal sealed class AppWindow : IbForm
             SetBusy(false, "");
             return;
         }
-        SetBusy(true, "");
+        SetBusy(true, "Starting…");
         BootOn();
     }
 
     private void BootOn()
     {
-        _ui.SetLoading(true, "Turning on");
         ThreadPool.QueueUserWorkItem(delegate
         {
             var startOut = "";
@@ -194,7 +193,6 @@ internal sealed class AppWindow : IbForm
                         var fail = FailHint(startOut) ?? FailHint(status);
                         if (fail != null) _ui.Sub = fail;
                     }
-                    _ui.SetLoading(false, null);
                     SetBusy(false, "");
                 });
             }
@@ -204,7 +202,7 @@ internal sealed class AppWindow : IbForm
 
     private void ToggleShield()
     {
-        if (_busy || _ui.Loading) return;
+        if (_busy) return;
         if (!_running)
         {
             SetBusy(true, "");

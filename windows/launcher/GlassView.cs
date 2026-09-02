@@ -87,8 +87,8 @@ internal sealed class GlassView : Control
         _search.Box.GotFocus += delegate { Invalidate(); };
         _search.Box.LostFocus += delegate { Invalidate(); };
         _search.Box.TextChanged += delegate { Invalidate(); };
-        _search.Visible = false;
-        SetLoading(true, "Turning on");
+        _search.Visible = true;
+        SetLoading(false, null);
     }
 
     public void SetLoading(bool on, string text)
