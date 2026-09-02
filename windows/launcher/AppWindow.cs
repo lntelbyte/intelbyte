@@ -463,8 +463,8 @@ internal sealed class AppWindow : IbForm
             || text.IndexOf("running unprotected", StringComparison.OrdinalIgnoreCase) >= 0)
         {
             if (text.IndexOf("Brave", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "Close and reopen Brave once to enable masking.";
-            return "Close and reopen the unprotected app once to enable masking.";
+                return "Brave is being reopened with masking enabled.";
+            return "The unprotected app is being reopened with masking enabled.";
         }
         return null;
     }

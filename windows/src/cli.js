@@ -321,8 +321,8 @@ async function cmdSetup() {
   for (const id of removedIds) info(`Dropped stale app: ${id}`);
   line('');
   ok('App shortcuts now open with the debug port on. The background shield attaches automatically.');
-  line(c.gray('  Open Brave / Chrome / Edge yourself — the shield injects without closing them.'));
-  line(c.gray('  Discord / Electron started without the flag may still be reopened once.'));
+  line(c.gray('  Browser apps started without the debug flag are reopened once automatically.'));
+  line(c.gray('  Discord / Electron started without the flag are handled the same way.'));
   warn('Trade-off: an open debug port is a local attack surface (any local process could');
   line(c.gray('  drive the app). Undo anytime with: ') + c.cyan('intelbyte unsetup'));
 

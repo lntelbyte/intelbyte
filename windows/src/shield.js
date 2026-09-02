@@ -56,7 +56,7 @@ export async function runShield(platform, cfg, opts = {}) {
       line(
         c.gray('  Discord / Electron launched without the debug port get reopened once.') +
           '\n' +
-          c.gray('  Browsers are left alone — open them yourself; the shield attaches.')
+          c.gray('  Browsers launched without the debug port get reopened once automatically.')
       );
       line('');
     }
@@ -193,7 +193,7 @@ export async function runShield(platform, cfg, opts = {}) {
           if (!quiet) info(`${a.label} closed — waiting for its next launch.`);
           emit({ type: 'closed', id, label: a.label });
         }
-      } else if (autoRelaunch && a.kind !== 'browser' && a.kind !== 'firefox') {
+      } else if (autoRelaunch && a.kind !== 'firefox') {
         await ensureProtected(id);
       }
     }
