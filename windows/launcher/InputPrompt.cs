@@ -99,7 +99,7 @@ internal sealed class InputPrompt : IbForm
             LayoutFields();
             Invalidate();
         };
-        StreamCapture.HideFromCapture(this);
+        StreamCapture.Attach(this);
     }
 
     private GlassField MakeField(string ghost, string kicker, string optional)

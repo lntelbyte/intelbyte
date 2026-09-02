@@ -28,6 +28,7 @@ internal sealed class GlassView : Control
     public string Count = "0";
     public string Foot = "";
     public bool Startup;
+    public bool StreamProof;
     public bool Busy;
     public bool Loading;
     public string LoadText = "Turning on";
@@ -40,6 +41,7 @@ internal sealed class GlassView : Control
     public event Action<string> KindClick;
     public event EventHandler RemoveClick;
     public event EventHandler StartupClick;
+    public event EventHandler StreamProofClick;
 
     private readonly Image _logo;
     private readonly GlassField _search;
@@ -52,7 +54,7 @@ internal sealed class GlassView : Control
     private readonly HashSet<string> _revealed = new HashSet<string>();
 
     private Rectangle _card;
-    private Rectangle _rClose, _rMin, _rGreen, _rLogo, _rOff, _rOn, _rBar, _rAdd, _rField, _rList, _rStart, _rFoot, _rSite, _rDisc;
+    private Rectangle _rClose, _rMin, _rGreen, _rLogo, _rOff, _rOn, _rBar, _rAdd, _rField, _rList, _rStart, _rProof, _rFoot, _rSite, _rDisc;
     private Rectangle[] _nav = new Rectangle[3];
     private readonly string[] _navText = { "EMAIL", "PHONE", "CUSTOM" };
 
@@ -200,7 +202,8 @@ internal sealed class GlassView : Control
         _rField = new Rectangle(_rBar.X, _rBar.Y, _rBar.Width - Add, Add);
         _rList = new Rectangle(right, top + Add + Pad, rightW, bottom - Row - (top + Add + Pad));
         _rStart = new Rectangle(right, bottom - Row, rightW, Row);
-        _rFoot = new Rectangle(left, bottom - Row, LeftW, Row);
+        _rProof = new Rectangle(left, bottom - Row, LeftW, Row);
+        _rFoot = new Rectangle(left, _rProof.Y - 18, LeftW, 18);
     }
 
     protected override void OnPaintBackground(PaintEventArgs pevent) { }
@@ -285,6 +288,11 @@ internal sealed class GlassView : Control
         TextRenderer.DrawText(g, Startup ? "Auto-start when PC turns on  ·  On" : "Auto-start when PC turns on  ·  Off",
             _fMeta, _rStart, startCol,
             TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+
+        var proofCol = _hot == 9 ? Color.White : Color.FromArgb(186, 186, 190);
+        TextRenderer.DrawText(g, StreamProof ? "Stream proof  ·  On" : "Stream proof  ·  Off",
+            _fMeta, _rProof, proofCol,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
     }
 
     private void DrawLoading(Graphics g)
@@ -432,6 +440,7 @@ internal sealed class GlassView : Control
             return;
         }
         if (hot == 4) { if (StartupClick != null) StartupClick(this, EventArgs.Empty); return; }
+        if (hot == 9) { if (StreamProofClick != null) StreamProofClick(this, EventArgs.Empty); return; }
         if (hot == 7) { OpenUrl("https://intelbyte.cc"); return; }
         if (hot == 8) { OpenUrl("https://discord.gg/intelbyte"); return; }
         if (hot == 5 || hot == 6)
@@ -474,6 +483,7 @@ internal sealed class GlassView : Control
         if (_rOff.Contains(pt)) return 5;
         if (_rOn.Contains(pt)) return 6;
         if (_rStart.Contains(pt)) return 4;
+        if (_rProof.Contains(pt)) return 9;
         if (_rSite.Contains(pt)) return 7;
         if (_rDisc.Contains(pt)) return 8;
         for (var i = 0; i < _nav.Length; i++)

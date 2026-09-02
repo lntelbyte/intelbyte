@@ -57,6 +57,12 @@ internal sealed class AppWindow : IbForm
             OnStartupToggled();
             _ui.Invalidate();
         };
+        _ui.StreamProofClick += delegate
+        {
+            _ui.StreamProof = !_ui.StreamProof;
+            StreamCapture.SetHidden(_ui.StreamProof);
+            _ui.Invalidate();
+        };
         _ui.Field.KeyDown += AddFieldKeyDown;
         Controls.Add(_ui);
 
@@ -67,7 +73,7 @@ internal sealed class AppWindow : IbForm
         if (!startMinimized) _refreshTimer.Start();
 
         if (Environment.GetEnvironmentVariable("INTELBYTE_GUI_PREVIEW") != "1")
-            StreamCapture.HideFromCapture(this);
+            StreamCapture.Attach(this);
     }
 
     protected override void OnShown(EventArgs e)

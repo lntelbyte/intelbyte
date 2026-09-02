@@ -251,17 +251,32 @@ internal static class DwmGlass
 
 internal static class StreamCapture
 {
+    private const uint WdaNone = 0x00000000;
     private const uint WdaExcludeFromCapture = 0x00000011;
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
 
-    public static void HideFromCapture(Form form)
+    private static readonly List<Form> _forms = new List<Form>();
+    public static bool Hidden;
+
+    public static void Attach(Form form)
     {
         if (form == null) return;
-        Apply(form);
+        if (!_forms.Contains(form)) _forms.Add(form);
         form.HandleCreated += StreamCaptureOnHandle;
         form.Shown += StreamCaptureOnHandle;
+        form.FormClosed += delegate
+        {
+            _forms.Remove(form);
+        };
+        Apply(form);
+    }
+
+    public static void SetHidden(bool hidden)
+    {
+        Hidden = hidden;
+        foreach (var f in _forms.ToArray()) Apply(f);
     }
 
     private static void StreamCaptureOnHandle(object sender, EventArgs e)
@@ -272,7 +287,7 @@ internal static class StreamCapture
     private static void Apply(Form form)
     {
         if (form == null || form.IsDisposed || !form.IsHandleCreated) return;
-        try { SetWindowDisplayAffinity(form.Handle, WdaExcludeFromCapture); }
+        try { SetWindowDisplayAffinity(form.Handle, Hidden ? WdaExcludeFromCapture : WdaNone); }
         catch {}
     }
 }

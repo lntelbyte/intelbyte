@@ -37,17 +37,28 @@ export function psJson(script) {
   }
 }
 
-export function psAsync(script) {
+export function psAsync(script, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     const child = spawn(PS, BASE_ARGS, { windowsHide: true });
     let out = '';
     let errOut = '';
+    let done = false;
+    const finish = (fn) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      fn();
+    };
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch {}
+      finish(() => reject(new Error('powershell timeout')));
+    }, timeoutMs);
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (errOut += d));
-    child.on('error', reject);
+    child.on('error', (e) => finish(() => reject(e)));
     child.on('close', (code) => {
-      if (code === 0) resolve(out.trim());
-      else reject(new Error(`powershell exited ${code}: ${errOut.trim()}`));
+      if (code === 0) finish(() => resolve(out.trim()));
+      else finish(() => reject(new Error(`powershell exited ${code}: ${errOut.trim()}`)));
     });
     child.stdin.end(script);
   });

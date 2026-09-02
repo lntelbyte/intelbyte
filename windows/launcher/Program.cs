@@ -107,10 +107,25 @@ internal static class Program
             using (var proc = Process.Start(psi))
             {
                 if (proc == null) return "";
-                var outText = proc.StandardOutput.ReadToEnd();
-                var errText = proc.StandardError.ReadToEnd();
-                proc.WaitForExit();
-                return outText + errText;
+                var output = new StringBuilder();
+                var error = new StringBuilder();
+                proc.OutputDataReceived += delegate(object s, DataReceivedEventArgs e)
+                {
+                    if (e.Data != null) lock (output) output.AppendLine(e.Data);
+                };
+                proc.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e)
+                {
+                    if (e.Data != null) lock (error) error.AppendLine(e.Data);
+                };
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                if (!proc.WaitForExit(15000))
+                {
+                    try { proc.Kill(); } catch {}
+                    try { proc.WaitForExit(2000); } catch {}
+                    return "ERROR: timed out";
+                }
+                return output.ToString() + error.ToString();
             }
         }
         catch (Exception ex)
