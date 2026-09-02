@@ -181,7 +181,7 @@ internal sealed class AppWindow : IbForm
                 if (!_setupAttempted)
                 {
                     var before = Program.RunCli(_node, _bin, _app, new[] { "status" });
-                    if (before.IndexOf("No apps wired yet", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (before.IndexOf("IB_APPS=0", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         var setup = Program.RunCli(_node, _bin, _app, new[] { "setup" });
                         _setupAttempted = setup.IndexOf("Setup done", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -213,11 +213,6 @@ internal sealed class AppWindow : IbForm
                     {
                         var fail = FailHint(startOut) ?? FailHint(status);
                         if (fail != null) _ui.Sub = fail;
-                    }
-                    else
-                    {
-                        var restart = RestartHint(status);
-                        if (restart != null) _ui.Sub = restart;
                     }
                     _ui.Invalidate();
                 });
@@ -431,7 +426,8 @@ internal sealed class AppWindow : IbForm
         var running = IsShieldUp(status);
         _running = running;
         _ui.Big = running ? "ON" : "OFF";
-        _ui.Sub = running ? "Masking email & phone on stream." : "Click ON to start protecting.";
+        var restart = running ? RestartHint(status) : null;
+        _ui.Sub = restart ?? (running ? "Masking email & phone on stream." : "Click ON to start protecting.");
         var rows = ParseList(list);
         _ui.SetRows(rows);
         _ui.Status = running ? "On" : "Off";
@@ -465,7 +461,11 @@ internal sealed class AppWindow : IbForm
         if (string.IsNullOrEmpty(text)) return null;
         if (text.IndexOf("RUNNING UNPROTECTED", StringComparison.OrdinalIgnoreCase) >= 0
             || text.IndexOf("running unprotected", StringComparison.OrdinalIgnoreCase) >= 0)
-            return "Close and reopen Brave once to enable masking.";
+        {
+            if (text.IndexOf("Brave", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Close and reopen Brave once to enable masking.";
+            return "Close and reopen the unprotected app once to enable masking.";
+        }
         return null;
     }
 

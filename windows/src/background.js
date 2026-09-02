@@ -353,7 +353,9 @@ export function cmdStatus() {
   title('intelbyte • background shield status');
   const running = isRunning();
   const pid = readPid();
+  const appCount = Object.keys(load().apps || {}).length;
   console.log(running ? 'IB_STATE=running' : 'IB_STATE=stopped');
+  console.log(`IB_APPS=${appCount}`);
   if (running) ok(`Running (pid ${pid})` + (isPaused() ? c.yellow('  · PAUSED') : ''));
   else warn('Not running. Start it with ' + c.cyan('intelbyte start') + ' or ' + c.cyan('intelbyte install') + '.');
 
