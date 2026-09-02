@@ -34,7 +34,7 @@ import {
 import { spawn } from 'child_process';
 import { join } from 'path';
 
-const VERSION = '0.3.16';
+const VERSION = '0.3.17';
 const TRAY_SCRIPT = trayScript();
 
 const CMD = { emails: 'protect-mail', phones: 'protect-phone', customs: 'protect-custom' };
