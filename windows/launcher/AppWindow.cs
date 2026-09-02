@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Net;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -17,6 +20,7 @@ internal sealed class AppWindow : IbForm
 
     private NotifyIcon _tray;
     private System.Windows.Forms.Timer _refreshTimer;
+    private System.Windows.Forms.Timer _updateTimer;
     private bool _running;
     private bool _busy;
     private bool _reallyQuit;
@@ -24,6 +28,8 @@ internal sealed class AppWindow : IbForm
     private bool _bootDone;
     private bool _setupAttempted;
     private bool _balloonShown;
+    private bool _updateCheckStarted;
+    private bool _updateInstalling;
     private volatile bool _refreshing;
 
     public static readonly int WmShowIntelByte =
@@ -72,6 +78,18 @@ internal sealed class AppWindow : IbForm
         _refreshTimer = new System.Windows.Forms.Timer { Interval = 5000 };
         _refreshTimer.Tick += delegate { if (!_busy) RefreshAsync(false); };
         if (!startMinimized) _refreshTimer.Start();
+
+        _updateTimer = new System.Windows.Forms.Timer { Interval = 30 * 60 * 1000 };
+        _updateTimer.Tick += delegate
+        {
+            if (!_updateInstalling)
+            {
+                _updateCheckStarted = false;
+                BeginUpdateCheck();
+            }
+        };
+        if (Environment.GetEnvironmentVariable("INTELBYTE_GUI_PREVIEW") != "1")
+            _updateTimer.Start();
 
         if (Environment.GetEnvironmentVariable("INTELBYTE_GUI_PREVIEW") != "1")
             StreamCapture.Attach(this);
@@ -154,6 +172,7 @@ internal sealed class AppWindow : IbForm
             return;
         }
         if (_tray != null) _tray.Visible = false;
+        if (_updateTimer != null) _updateTimer.Stop();
         base.OnFormClosing(e);
     }
 
@@ -215,10 +234,165 @@ internal sealed class AppWindow : IbForm
                         if (fail != null) _ui.Sub = fail;
                     }
                     _ui.Invalidate();
+                    BeginUpdateCheck();
                 });
             }
             catch {}
         });
+    }
+
+    private sealed class UpdateInfo
+    {
+        public Version Version;
+        public string Tag;
+        public string DownloadUrl;
+    }
+
+    private void BeginUpdateCheck()
+    {
+        if (_updateCheckStarted || Environment.GetEnvironmentVariable("INTELBYTE_GUI_PREVIEW") == "1") return;
+        _updateCheckStarted = true;
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                Thread.Sleep(900);
+                var update = CheckForUpdate();
+                if (update == null) return;
+                try
+                {
+                    BeginInvoke((Action)delegate
+                    {
+                        if (!_updateInstalling && !_busy) StartUpdate(update);
+                    });
+                }
+                catch {}
+            }
+            catch {}
+        });
+    }
+
+    private static UpdateInfo CheckForUpdate()
+    {
+        try
+        {
+            var current = Assembly.GetExecutingAssembly().GetName().Version;
+            if (current == null) return null;
+
+            var request = (HttpWebRequest)WebRequest.Create(
+                "https://api.github.com/repos/lntelbyte/intelbyte/releases/latest");
+            request.Method = "GET";
+            request.UserAgent = "IntelByte-Updater/1.0";
+            request.Accept = "application/vnd.github+json";
+            request.Timeout = 7000;
+            request.ReadWriteTimeout = 7000;
+
+            string json;
+            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var reader = new StreamReader(response.GetResponseStream()))
+                json = reader.ReadToEnd();
+
+            var tagMatch = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.IgnoreCase);
+            if (!tagMatch.Success) return null;
+            var tag = tagMatch.Groups[1].Value.Trim();
+            var versionText = tag.StartsWith("v", StringComparison.OrdinalIgnoreCase)
+                ? tag.Substring(1) : tag;
+            Version remote;
+            if (!Version.TryParse(versionText, out remote) || remote <= current) return null;
+            if (!Regex.IsMatch(tag, "^v?\\d+(\\.\\d+){1,3}$", RegexOptions.CultureInvariant)) return null;
+
+            return new UpdateInfo
+            {
+                Version = remote,
+                Tag = tag,
+                DownloadUrl = "https://github.com/lntelbyte/intelbyte/releases/download/"
+                    + Uri.EscapeDataString(tag) + "/IntelByte-Setup.exe",
+            };
+        }
+        catch { return null; }
+    }
+
+    private void StartUpdate(UpdateInfo update)
+    {
+        if (update == null || _updateInstalling || IsDisposed) return;
+        _updateInstalling = true;
+        _busy = true;
+        _ui.Busy = true;
+        _ui.SetLoading(true, "New version detected");
+
+        ThreadPool.QueueUserWorkItem(delegate
+        {
+            try
+            {
+                Thread.Sleep(900);
+                try { BeginInvoke((Action)delegate { _ui.SetLoading(true, "Updating"); }); }
+                catch {}
+
+                var setupPath = DownloadUpdate(update);
+                try { BeginInvoke((Action)delegate { LaunchUpdate(setupPath); }); }
+                catch {}
+            }
+            catch
+            {
+                try
+                {
+                    BeginInvoke((Action)delegate
+                    {
+                        _updateInstalling = false;
+                        _busy = false;
+                        _ui.Busy = false;
+                        _ui.SetLoading(false, null);
+                        _ui.Sub = "Could not update automatically. Try again later.";
+                        _ui.Invalidate();
+                    });
+                }
+                catch {}
+            }
+        });
+    }
+
+    private static string DownloadUpdate(UpdateInfo update)
+    {
+        var safeVersion = update.Version.ToString().Replace('.', '_');
+        var path = Path.Combine(Path.GetTempPath(), "IntelByte-Setup-" + safeVersion + ".exe");
+        try { if (File.Exists(path)) File.Delete(path); } catch {}
+
+        using (var client = new WebClient())
+        {
+            client.Headers[HttpRequestHeader.UserAgent] = "IntelByte-Updater/1.0";
+            client.DownloadFile(update.DownloadUrl, path);
+        }
+        if (!File.Exists(path) || new FileInfo(path).Length < 1024 * 1024)
+            throw new InvalidOperationException("Downloaded installer is incomplete.");
+        return path;
+    }
+
+    private void LaunchUpdate(string setupPath)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(setupPath) || !File.Exists(setupPath)) throw new FileNotFoundException();
+            var root = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var safeRoot = (root ?? "").Replace("\"", "");
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = setupPath,
+                Arguments = "/update \"" + safeRoot + "\"",
+                WorkingDirectory = Path.GetDirectoryName(setupPath),
+                UseShellExecute = true,
+            });
+            _reallyQuit = true;
+            Close();
+        }
+        catch
+        {
+            _updateInstalling = false;
+            _busy = false;
+            _ui.Busy = false;
+            _ui.SetLoading(false, null);
+            _ui.Sub = "Could not start the update. Try again later.";
+            _ui.Invalidate();
+        }
     }
 
     private void ToggleShield()

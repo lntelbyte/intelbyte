@@ -7,7 +7,7 @@ namespace IntelByteSetup
     internal static class Program
     {
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += delegate(object s, ThreadExceptionEventArgs e)
@@ -32,7 +32,7 @@ namespace IntelByteSetup
             {
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new InstallerForm());
+                Application.Run(new InstallerForm(args));
             }
             catch (Exception ex)
             {

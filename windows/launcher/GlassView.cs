@@ -19,8 +19,8 @@ internal sealed class GlassView : Control
     public const int Cluster = 12;
     public const int Logo = 72;
     public const int LeftW = 240;
-    public const int ToggleW = 168;
-    public const int ToggleH = 36;
+    public const int ToggleW = 176;
+    public const int ToggleH = 42;
 
     private string _big = "OFF";
     public string Big
@@ -480,8 +480,7 @@ internal sealed class GlassView : Control
 
     private bool InToggleRail(Point pt)
     {
-        var rail = new Rectangle(Pad, Header, LeftW + Pad, Math.Max(8, Height - Header - Row * 2));
-        return rail.Contains(pt);
+        return _switch != null && _switch.Visible && _switch.Bounds.Contains(pt);
     }
 
     private int Hit(Point pt)
@@ -549,23 +548,69 @@ internal sealed class OnOffSwitch : Control
 {
     public bool On;
     public event EventHandler Toggled;
-    private readonly Font _font = new Font("Segoe UI Semibold", 10f);
+    private readonly Font _font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+    private bool _hover;
+    private bool _pressed;
 
     public OnOffSwitch()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Cursor = Cursors.Hand;
-        TabStop = false;
+        TabStop = true;
+        AccessibleName = "IntelByte protection on or off";
+        AccessibleRole = AccessibleRole.PushButton;
         BackColor = Color.FromArgb(28, 28, 32);
         Size = new Size(GlassView.ToggleW, GlassView.ToggleH);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Left && Toggled != null)
-            Toggled(this, EventArgs.Empty);
+        if (e.Button == MouseButtons.Left)
+        {
+            _pressed = true;
+            Focus();
+            Invalidate();
+        }
         base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            var activate = _pressed && ClientRectangle.Contains(e.Location);
+            _pressed = false;
+            Invalidate();
+            if (activate && Toggled != null) Toggled(this, EventArgs.Empty);
+        }
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        _hover = true;
+        Invalidate();
+        base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        _hover = false;
+        _pressed = false;
+        Invalidate();
+        base.OnMouseLeave(e);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if ((e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter) && Toggled != null)
+        {
+            e.Handled = true;
+            Toggled(this, EventArgs.Empty);
+            return;
+        }
+        base.OnKeyDown(e);
     }
 
     protected override void OnPaintBackground(PaintEventArgs e) { }
@@ -576,27 +621,53 @@ internal sealed class OnOffSwitch : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-        var pill = new Rectangle(0, 0, Width - 1, Height - 1);
+        var pill = new Rectangle(1, 1, Width - 3, Height - 3);
+        var radius = Math.Max(8, Height / 2);
+        var trackColor = On
+            ? (_hover ? Color.FromArgb(37, 84, 64) : Color.FromArgb(31, 67, 53))
+            : (_hover ? Color.FromArgb(48, 50, 60) : Color.FromArgb(36, 38, 46));
+
+        var shadow = pill;
+        shadow.Offset(0, 2);
+        using (var shadowPath = UiShapes.RoundedRect(shadow, radius))
+        using (var shadowFill = new SolidBrush(Color.FromArgb(80, 0, 0, 0)))
+            g.FillPath(shadowFill, shadowPath);
         using (var track = UiShapes.RoundedRect(pill, Height / 2))
-        using (var trackFill = new SolidBrush(Color.FromArgb(230, 28, 28, 32)))
+        using (var trackFill = new SolidBrush(trackColor))
             g.FillPath(trackFill, track);
         var half = Width / 2;
-        var thumb = On ? new Rectangle(half, 0, Width - half, Height) : new Rectangle(0, 0, half, Height);
-        thumb.Inflate(-3, -3);
-        using (var tpath = UiShapes.RoundedRect(thumb, Math.Max(4, (Height - 6) / 2)))
+        var thumb = On
+            ? new Rectangle(half + 2, 3, Width - half - 6, Height - 8)
+            : new Rectangle(3, 3, half - 4, Height - 8);
+        if (_pressed) thumb.Offset(On ? -1 : 1, 0);
+        using (var tpath = UiShapes.RoundedRect(thumb, Math.Max(6, (Height - 8) / 2)))
         using (var fill = new SolidBrush(On
-            ? Color.FromArgb(186, 214, 176)
-            : Color.FromArgb(236, 236, 240)))
+            ? (_hover ? Color.FromArgb(112, 235, 166) : Color.FromArgb(92, 218, 148))
+            : (_hover ? Color.FromArgb(250, 250, 252) : Color.FromArgb(232, 233, 238))))
             g.FillPath(fill, tpath);
-        using (var ring = new Pen(Color.FromArgb(90, 255, 255, 255)))
+        using (var thumbEdge = new Pen(On ? Color.FromArgb(115, 193, 158) : Color.FromArgb(190, 190, 198), 1f))
+        using (var thumbOutline = UiShapes.RoundedRect(thumb, Math.Max(6, (Height - 8) / 2)))
+            g.DrawPath(thumbEdge, thumbOutline);
+        using (var ring = new Pen(On ? Color.FromArgb(130, 112, 235, 166) : Color.FromArgb(90, 255, 255, 255)))
         using (var outline = UiShapes.RoundedRect(pill, Height / 2))
             g.DrawPath(ring, outline);
-        var offCol = !On ? Color.FromArgb(20, 20, 22) : Color.FromArgb(210, 210, 214);
-        var onCol = On ? Color.FromArgb(20, 20, 22) : Color.FromArgb(210, 210, 214);
+        var dot = new Rectangle(On ? Width - 22 : 11, Height / 2 - 3, 6, 6);
+        using (var dotFill = new SolidBrush(On ? Color.FromArgb(20, 92, 61) : Color.FromArgb(126, 128, 138)))
+            g.FillEllipse(dotFill, dot);
+        var offCol = !On ? Color.FromArgb(25, 27, 32) : Color.FromArgb(180, 205, 194);
+        var onCol = On ? Color.FromArgb(18, 48, 34) : Color.FromArgb(170, 172, 182);
         TextRenderer.DrawText(g, "OFF", _font, new Rectangle(0, 0, half, Height), offCol,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
         TextRenderer.DrawText(g, "ON", _font, new Rectangle(half, 0, Width - half, Height), onCol,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        if (Focused)
+        {
+            var focus = pill;
+            focus.Inflate(-2, -2);
+            using (var focusPen = new Pen(Color.FromArgb(190, 255, 255, 255), 1f))
+            using (var focusPath = UiShapes.RoundedRect(focus, Math.Max(6, Height / 2 - 3)))
+                g.DrawPath(focusPen, focusPath);
+        }
     }
 
     protected override void Dispose(bool disposing)

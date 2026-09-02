@@ -19,9 +19,13 @@ namespace IntelByteSetup
         private readonly Label _status;
         private readonly Button _installBtn;
         private readonly Button _cancelBtn;
+        private readonly bool _updateMode;
 
-        public InstallerForm()
+        public InstallerForm() : this(new string[0]) {}
+
+        public InstallerForm(string[] args)
         {
+            _updateMode = HasUpdateFlag(args);
             Text = "IntelByte Setup";
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -154,6 +158,46 @@ namespace IntelByteSetup
 
             _pathBox.TextChanged += delegate { UpdateInstallLabel(); };
             UpdateInstallLabel();
+
+            if (_updateMode)
+            {
+                Text = "IntelByte Update";
+                _pathBox.Text = UpdateTarget(args) ?? DefaultInstallDir();
+                _pathBox.Enabled = false;
+                browse.Visible = false;
+                _desktopShortcut.Checked = true;
+                _launchAfter.Checked = true;
+                _desktopShortcut.Visible = false;
+                _launchAfter.Visible = false;
+                _installBtn.Visible = false;
+                _cancelBtn.Visible = false;
+                _status.Text = "Updating IntelByte…";
+                Shown += delegate { BeginInstall(); };
+            }
+        }
+
+        private static bool HasUpdateFlag(string[] args)
+        {
+            if (args == null) return false;
+            foreach (var arg in args)
+                if (string.Equals(arg, "/update", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(arg, "--update", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        private static string UpdateTarget(string[] args)
+        {
+            if (args == null) return null;
+            for (var i = 0; i + 1 < args.Length; i++)
+            {
+                if (string.Equals(args[i], "/update", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(args[i], "--update", StringComparison.OrdinalIgnoreCase))
+                {
+                    var value = (args[i + 1] ?? "").Trim();
+                    if (value.Length > 0 && !value.StartsWith("/", StringComparison.Ordinal)) return value;
+                }
+            }
+            return null;
         }
 
         private void UpdateInstallLabel()
@@ -396,6 +440,12 @@ namespace IntelByteSetup
 
         private void InstallSucceeded()
         {
+            if (_updateMode)
+            {
+                DialogResult = DialogResult.OK;
+                Close();
+                return;
+            }
             MessageBox.Show(this,
                 "IntelByte is installed.\n\nThe IntelByte window will open — protection turns on automatically. Use the desktop shortcut to open it again anytime.",
                 "IntelByte Setup",
